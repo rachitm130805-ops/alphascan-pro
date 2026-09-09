@@ -43,8 +43,26 @@ st.markdown(
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = None
 
-# Automatically fetch all users who clicked /start on Telegram Bot
-def get_bot_subscribers():
+def send_welcome_buttons(chat_id):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": "⚡ *Welcome to AlphaScan Pro Terminal Bot!*\n\nAapka account live stock scan alerts ke liye successfully register ho gaya hai.",
+        "parse_mode": "Markdown",
+        "reply_markup": {
+            "inline_keyboard": [
+                [
+                    {"text": "🌐 Open Web Terminal", "url": "https://alphascan-pro.streamlit.app"}
+                ]
+            ]
+        }
+    }
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception:
+        pass
+
+def process_telegram_updates():
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
     try:
         res = requests.get(url, timeout=10)
@@ -53,7 +71,12 @@ def get_bot_subscribers():
             chat_ids = set()
             for result in data.get("result", []):
                 if "message" in result and "chat" in result["message"]:
-                    chat_ids.add(result["message"]["chat"]["id"])
+                    chat_id = result["message"]["chat"]["id"]
+                    text = result["message"].get("text", "")
+                    chat_ids.add(chat_id)
+                    
+                    if text == "/start":
+                        send_welcome_buttons(chat_id)
             return list(chat_ids)
     except Exception:
         pass
@@ -169,9 +192,8 @@ elif scan_mode == "Nifty 50":
         "ITC.NS", "INDUSINDBK.NS", "INFY.NS", "JSWSTEEL.NS", "KOTAKBANK.NS",
         "LT.NS", "LTIM.NS", "M&M.NS", "MARUTI.NS", "NTPC.NS", "NESTLEIND.NS",
         "ONGC.NS", "POWERGRID.NS", "RELIANCE.NS", "SBILIFE.NS",
-        "SHRIRAMFIN.NS", "SBIN.NS", "SUNPHARMA.NS", "TCS.NS",
-        "TATACONSUM.NS", "TATAMOTORS.NS", "TATASTEEL.NS", "TECHM.NS",
-        "TITAN.NS", "ULTRACEMCO.NS", "WIPRO.NS",
+        "SHRIRAMFIN.NS", "SBIN.NS", "SUNPHARMA.NS", "TATASTEEL.NS",
+        "TATAMOTORS.NS", "TCS.NS", "TECHM.NS", "TITAN.NS", "ULTRACEMCO.NS", "WIPRO.NS",
     ]
 else:
     symbols_to_scan = get_all_nse_symbols()
@@ -222,7 +244,7 @@ if (
     st.dataframe(df_res, use_container_width=True)
 
     if st.button("📲 Push Alerts to Telegram"):
-        subscribers = get_bot_subscribers()
+        subscribers = process_telegram_updates()
         
         if not subscribers:
             st.error("No active users found! Make sure you and Ankur have opened @RA_TRADERADAR_BOT on Telegram and clicked START.")
