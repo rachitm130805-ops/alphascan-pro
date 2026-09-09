@@ -5,9 +5,25 @@ import requests
 import streamlit as st
 import ta
 import yfinance as yf
+from supabase import create_client, Client
 
 # Telegram Credentials
 BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
+
+# Supabase Credentials
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
+
+@st.cache_resource
+def init_supabase():
+    if SUPABASE_URL and SUPABASE_KEY:
+        try:
+            return create_client(SUPABASE_URL, SUPABASE_KEY)
+        except Exception:
+            return None
+    return None
+
+supabase = init_supabase()
 
 st.set_page_config(
     page_title="AlphaScan Pro | Technical Terminal",
@@ -64,23 +80,26 @@ def send_welcome_buttons(chat_id):
 
 def process_telegram_updates():
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
+    users_dict = {}
     try:
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
             data = res.json()
-            chat_ids = set()
             for result in data.get("result", []):
                 if "message" in result and "chat" in result["message"]:
-                    chat_id = result["message"]["chat"]["id"]
+                    chat_id = str(result["message"]["chat"]["id"])
                     text = result["message"].get("text", "")
-                    chat_ids.add(chat_id)
+                    first_name = result["message"]["chat"].get("first_name", "User")
+                    username = result["message"]["chat"].get("username", "")
+                    
+                    display_name = f"{first_name} (@{username})" if username else f"{first_name} ({chat_id})"
+                    users_dict[display_name] = chat_id
                     
                     if text == "/start":
                         send_welcome_buttons(chat_id)
-            return list(chat_ids)
     except Exception:
         pass
-    return []
+    return users_dict
 
 def send_telegram_alert(message, chat_id):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -165,8 +184,20 @@ buffer_pct = st.sidebar.slider(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("🤖 Telegram Bot Connection")
-st.sidebar.info("Search **@RA_TRADERADAR_BOT** on Telegram & click **START** to receive alerts.")
+st.sidebar.subheader("🤖 Telegram Alert Routing")
+
+bot_users = process_telegram_updates()
+
+if bot_users:
+    selected_user = st.sidebar.selectbox(
+        "Select Your Profile (Target Account):",
+        options=list(bot_users.keys()),
+        help="Alerts will be sent ONLY to the selected Telegram user."
+    )
+    target_chat_id = bot_users[selected_user]
+else:
+    st.sidebar.warning("No active users found. Search @RA_TRADERADAR_BOT on Telegram & click START.")
+    target_chat_id = None
 
 symbols_to_scan = []
 
@@ -244,10 +275,8 @@ if (
     st.dataframe(df_res, use_container_width=True)
 
     if st.button("📲 Push Alerts to Telegram"):
-        subscribers = process_telegram_updates()
-        
-        if not subscribers:
-            st.error("No active users found! Make sure you and Ankur have opened @RA_TRADERADAR_BOT on Telegram and clicked START.")
+        if not target_chat_id:
+            st.error("No target user selected! Please select your profile in the sidebar.")
         else:
             matches_text = [
                 f"• {row['Stock']}: Price Rs.{row['Price (₹)']} | 10 EMA Rs.{row['10 EMA (₹)']} ({row['Distance from EMA (%)']})"
@@ -255,18 +284,17 @@ if (
             ]
 
             total_sent = 0
-            for subscriber_id in subscribers:
-                for i in range(0, len(matches_text), 15):
-                    chunk = matches_text[i : i + 15]
-                    msg = (
-                        f"⚡ ALPHASCAN PRO ALERTS (Part {i//15 + 1})\n\n"
-                        + "\n".join(chunk)
-                    )
-                    if send_telegram_alert(msg, subscriber_id):
-                        total_sent += 1
-                    time.sleep(0.5)
+            for i in range(0, len(matches_text), 15):
+                chunk = matches_text[i : i + 15]
+                msg = (
+                    f"⚡ ALPHASCAN PRO ALERTS (Part {i//15 + 1})\n\n"
+                    + "\n".join(chunk)
+                )
+                if send_telegram_alert(msg, target_chat_id):
+                    total_sent += 1
+                time.sleep(0.5)
 
             if total_sent > 0:
-                st.success(f"✅ Telegram Alerts Dispatched to {len(subscribers)} active bot subscriber(s)!")
+                st.success(f"✅ Telegram Alerts Dispatched exclusively to {selected_user}!")
             else:
                 st.error("❌ Failed to send Telegram message.")
