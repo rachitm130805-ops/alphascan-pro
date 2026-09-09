@@ -6,10 +6,9 @@ import streamlit as st
 import ta
 import yfinance as yf
 
-# Telegram Details
-BOT_TOKEN = "7711914686:AAGSBGeLuE_qPj-EKYwDw0h8kTb706k1El8"
-CHAT_ID = "1767212431"
-
+# Telegram Details (Secure)
+BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
+CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID", "1767212431")
 st.set_page_config(
     page_title="AlphaScan Pro | Technical Terminal",
     page_icon="⚡",
