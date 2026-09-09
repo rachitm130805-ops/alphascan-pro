@@ -2,5 +2,7 @@ streamlit
 pandas
 yfinance
 ta
-python-telegram-bot
+requests
+supabase
 plotly
+python-telegram-bot
