@@ -6,15 +6,16 @@ import streamlit as st
 import ta
 import yfinance as yf
 
-# Telegram Details (Secure)
+# Telegram Credentials
 BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
-CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID", "1767212431")
+
 st.set_page_config(
     page_title="AlphaScan Pro | Technical Terminal",
     page_icon="⚡",
     layout="wide",
 )
 
+# Custom Styling (Pro Dark Theme)
 st.markdown(
     """
     <style>
@@ -27,7 +28,7 @@ st.markdown(
         color: white;
         border-radius: 6px;
         border: none;
-        padding: 8px 16px;
+        padding: 10px 20px;
         font-weight: bold;
         width: 100%;
     }
@@ -42,17 +43,30 @@ st.markdown(
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = None
 
+# Automatically fetch all users who clicked /start on Telegram Bot
+def get_bot_subscribers():
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
+    try:
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            chat_ids = set()
+            for result in data.get("result", []):
+                if "message" in result and "chat" in result["message"]:
+                    chat_ids.add(result["message"]["chat"]["id"])
+            return list(chat_ids)
+    except Exception:
+        pass
+    return []
 
-def send_telegram(message):
+def send_telegram_alert(message, chat_id):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message}
+    payload = {"chat_id": chat_id, "text": message}
     try:
         res = requests.post(url, json=payload, timeout=10)
         return res.status_code == 200
-    except Exception as e:
-        st.error(f"Telegram Connection Error: {e}")
+    except Exception:
         return False
-
 
 def get_all_nse_symbols():
     url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
@@ -70,7 +84,6 @@ def get_all_nse_symbols():
     except Exception:
         pass
     return ["RELIANCE.NS", "TATASTEEL.NS", "INFY.NS", "ICICIBANK.NS", "LT.NS"]
-
 
 def process_single_stock(symbol, buffer_pct):
     try:
@@ -108,11 +121,9 @@ def process_single_stock(symbol, buffer_pct):
         return None
     return None
 
-
+# App UI
 st.title("⚡ AlphaScan Pro Terminal")
-st.caption(
-    "Custom Swing Scanner | Weekly 10 EMA Support & Dynamic Parameter Engine"
-)
+st.caption("Custom Swing Scanner | Weekly 10 EMA Support & Dynamic Parameter Engine")
 st.divider()
 
 st.sidebar.header("⚙️ Scanner Configurations")
@@ -130,6 +141,10 @@ buffer_pct = st.sidebar.slider(
     step=0.1,
 )
 
+st.sidebar.markdown("---")
+st.sidebar.subheader("🤖 Telegram Bot Connection")
+st.sidebar.info("Search **@RA_TRADERADAR_BOT** on Telegram & click **START** to receive alerts.")
+
 symbols_to_scan = []
 
 if scan_mode == "Custom Stocks":
@@ -145,59 +160,19 @@ if scan_mode == "Custom Stocks":
 
 elif scan_mode == "Nifty 50":
     symbols_to_scan = [
-        "ADANIENT.NS",
-        "ADANIPORTS.NS",
-        "APOLLOHOSP.NS",
-        "ASIANPAINT.NS",
-        "AXISBANK.NS",
-        "BAJAJ-AUTO.NS",
-        "BAJFINANCE.NS",
-        "BAJAJFINSV.NS",
-        "BEL.NS",
-        "BPCL.NS",
-        "BHARTIARTL.NS",
-        "BRITANNIA.NS",
-        "CIPLA.NS",
-        "COALINDIA.NS",
-        "DIVISLAB.NS",
-        "DRREDDY.NS",
-        "EICHERMOT.NS",
-        "GRASIM.NS",
-        "HCLTECH.NS",
-        "HDFCBANK.NS",
-        "HDFCLIFE.NS",
-        "HEROMOTOCO.NS",
-        "HINDALCO.NS",
-        "HINDUNILVR.NS",
-        "ICICIBANK.NS",
-        "ITC.NS",
-        "INDUSINDBK.NS",
-        "INFY.NS",
-        "JSWSTEEL.NS",
-        "KOTAKBANK.NS",
-        "LT.NS",
-        "LTIM.NS",
-        "M&M.NS",
-        "MARUTI.NS",
-        "NTPC.NS",
-        "NESTLEIND.NS",
-        "ONGC.NS",
-        "POWERGRID.NS",
-        "RELIANCE.NS",
-        "SBILIFE.NS",
-        "SHRIRAMFIN.NS",
-        "SBIN.NS",
-        "SUNPHARMA.NS",
-        "TCS.NS",
-        "TATACONSUM.NS",
-        "TATAMOTORS.NS",
-        "TATASTEEL.NS",
-        "TECHM.NS",
-        "TITAN.NS",
-        "ULTRACEMCO.NS",
-        "WIPRO.NS",
+        "ADANIENT.NS", "ADANIPORTS.NS", "APOLLOHOSP.NS", "ASIANPAINT.NS",
+        "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BAJAJFINSV.NS",
+        "BEL.NS", "BPCL.NS", "BHARTIARTL.NS", "BRITANNIA.NS", "CIPLA.NS",
+        "COALINDIA.NS", "DIVISLAB.NS", "DRREDDY.NS", "EICHERMOT.NS",
+        "GRASIM.NS", "HCLTECH.NS", "HDFCBANK.NS", "HDFCLIFE.NS",
+        "HEROMOTOCO.NS", "HINDALCO.NS", "HINDUNILVR.NS", "ICICIBANK.NS",
+        "ITC.NS", "INDUSINDBK.NS", "INFY.NS", "JSWSTEEL.NS", "KOTAKBANK.NS",
+        "LT.NS", "LTIM.NS", "M&M.NS", "MARUTI.NS", "NTPC.NS", "NESTLEIND.NS",
+        "ONGC.NS", "POWERGRID.NS", "RELIANCE.NS", "SBILIFE.NS",
+        "SHRIRAMFIN.NS", "SBIN.NS", "SUNPHARMA.NS", "TCS.NS",
+        "TATACONSUM.NS", "TATAMOTORS.NS", "TATASTEEL.NS", "TECHM.NS",
+        "TITAN.NS", "ULTRACEMCO.NS", "WIPRO.NS",
     ]
-
 else:
     symbols_to_scan = get_all_nse_symbols()
 
@@ -247,23 +222,29 @@ if (
     st.dataframe(df_res, use_container_width=True)
 
     if st.button("📲 Push Alerts to Telegram"):
-        matches_text = [
-            f"• {row['Stock']}: Price Rs.{row['Price (₹)']} | 10 EMA Rs.{row['10 EMA (₹)']} ({row['Distance from EMA (%)']})"
-            for _, row in df_res.iterrows()
-        ]
-
-        delivered = False
-        for i in range(0, len(matches_text), 15):
-            chunk = matches_text[i : i + 15]
-            msg = (
-                f"⚡ ALPHASCAN PRO ALERTS (Part {i//15 + 1})\n\n"
-                + "\n".join(chunk)
-            )
-            if send_telegram(msg):
-                delivered = True
-            time.sleep(1)
-
-        if delivered:
-            st.success("✅ Telegram Alerts Dispatched! Check your Telegram App.")
+        subscribers = get_bot_subscribers()
+        
+        if not subscribers:
+            st.error("No active users found! Make sure you and Ankur have opened @RA_TRADERADAR_BOT on Telegram and clicked START.")
         else:
-            st.error("❌ Failed to send Telegram message.")
+            matches_text = [
+                f"• {row['Stock']}: Price Rs.{row['Price (₹)']} | 10 EMA Rs.{row['10 EMA (₹)']} ({row['Distance from EMA (%)']})"
+                for _, row in df_res.iterrows()
+            ]
+
+            total_sent = 0
+            for subscriber_id in subscribers:
+                for i in range(0, len(matches_text), 15):
+                    chunk = matches_text[i : i + 15]
+                    msg = (
+                        f"⚡ ALPHASCAN PRO ALERTS (Part {i//15 + 1})\n\n"
+                        + "\n".join(chunk)
+                    )
+                    if send_telegram_alert(msg, subscriber_id):
+                        total_sent += 1
+                    time.sleep(0.5)
+
+            if total_sent > 0:
+                st.success(f"✅ Telegram Alerts Dispatched to {len(subscribers)} active bot subscriber(s)!")
+            else:
+                st.error("❌ Failed to send Telegram message.")
