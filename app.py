@@ -56,8 +56,74 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Session State Management for User Login
+if "user" not in st.session_state:
+    st.session_state.user = None
+
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = None
+
+# --- AUTHENTICATION SCREEN ---
+if not st.session_state.user:
+    st.title("⚡ AlphaScan Pro | Secure Access")
+    st.caption("Please sign in or create an account to access the trading terminal.")
+    st.divider()
+
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.subheader("🔑 Sign In")
+        signin_email = st.text_input("Email (Sign In)", key="si_email")
+        signin_password = st.text_input("Password (Sign In)", type="password", key="si_pass")
+
+        if st.button("Login to Terminal"):
+            if not signin_email or not signin_password:
+                st.error("Please fill in all fields.")
+            else:
+                try:
+                    res = supabase.auth.sign_in_with_password({
+                        "email": signin_email,
+                        "password": signin_password
+                    })
+                    st.session_state.user = res.user
+                    st.success("Login Successful! Loading terminal...")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Login failed: {e}")
+
+    with col2:
+        st.subheader("📝 Register New Account")
+        signup_email = st.text_input("Email (Register)", key="su_email")
+        signup_password = st.text_input("Password (Register)", type="password", key="su_pass")
+
+        if st.button("Create Account"):
+            if not signup_email or not signup_password:
+                st.error("Please fill in all fields.")
+            else:
+                try:
+                    res = supabase.auth.sign_up({
+                        "email": signup_email,
+                        "password": signup_password
+                    })
+                    st.success("Account created successfully! You can now log in.")
+                except Exception as e:
+                    st.error(f"Registration failed: {e}")
+
+    st.stop()  # Stop execution here until user logs in
+
+# --- MAIN APP (AFTER SUCCESSFUL LOGIN) ---
+user_email = st.session_state.user.email if st.session_state.user else "User"
+
+st.sidebar.write(f"👤 Logged in as: **{user_email}**")
+if st.sidebar.button("🚪 Logout"):
+    try:
+        supabase.auth.sign_out()
+    except Exception:
+        pass
+    st.session_state.user = None
+    st.rerun()
+
+st.sidebar.divider()
 
 def send_welcome_buttons(chat_id):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -163,7 +229,7 @@ def process_single_stock(symbol, buffer_pct):
         return None
     return None
 
-# App UI
+# App UI Header
 st.title("⚡ AlphaScan Pro Terminal")
 st.caption("Custom Swing Scanner | Weekly 10 EMA Support & Dynamic Parameter Engine")
 st.divider()
