@@ -7,10 +7,8 @@ import ta
 import yfinance as yf
 from supabase import create_client, Client
 
-# Telegram Credentials
+# --- SECRETS & SUPABASE INIT ---
 BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
-
-# Supabase Credentials
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
@@ -25,162 +23,199 @@ def init_supabase():
 
 supabase = init_supabase()
 
+# --- PAGE CONFIG & CUSTOM STYLING ---
 st.set_page_config(
-    page_title="AlphaScan Pro | Technical Terminal",
+    page_title="AlphaScan Pro | Quant Terminal",
     page_icon="⚡",
     layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Custom Styling (Pro Dark Theme)
-st.markdown(
-    """
-    <style>
+st.markdown("""
+<style>
+    /* Global Dark Theme */
     .stApp {
-        background-color: #0d1117;
-        color: #c9d1d9;
+        background-color: #0b0e14;
+        color: #e6edf3;
     }
+    
+    /* Hero Card styling */
+    .hero-card {
+        background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 30px;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    
+    .feature-card {
+        background-color: #161b22;
+        border: 1px solid #21262d;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    /* Primary Accent Buttons */
     .stButton>button {
         background-color: #238636;
-        color: white;
+        color: #ffffff;
         border-radius: 6px;
-        border: none;
+        border: 1px solid rgba(240,246,252,0.1);
         padding: 10px 20px;
-        font-weight: bold;
-        width: 100%;
+        font-weight: 600;
+        transition: all 0.2s ease;
     }
     .stButton>button:hover {
         background-color: #2ea043;
+        border-color: #8b949e;
     }
-    </style>
-""",
-    unsafe_allow_html=True,
-)
+    
+    /* Secondary Action Buttons */
+    div[data-testid="stForm"] {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 10px;
+        padding: 20px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Session State Management for User Login
+# --- SESSION STATE MANAGEMENT ---
 if "user" not in st.session_state:
     st.session_state.user = None
-
+if "auth_mode" not in st.session_state:
+    st.session_state.auth_mode = None  # None, "login", or "register"
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = None
 
-# --- AUTHENTICATION SCREEN ---
+# --- TELEGRAM UTILS ---
+def send_telegram_alert(message, chat_id):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+    try:
+        res = requests.post(url, json=payload, timeout=8)
+        return res.status_code == 200
+    except Exception:
+        return False
+
+# --- LANDING PAGE (UNAUTHENTICATED) ---
 if not st.session_state.user:
-    st.title("⚡ AlphaScan Pro | Secure Access")
-    st.caption("Please sign in or create an account to access the trading terminal.")
-    st.divider()
+    # Top Hero Section
+    st.markdown("""
+    <div class="hero-card">
+        <h1 style="color: #58a6ff; font-size: 2.8rem; margin-bottom: 5px;">⚡ AlphaScan Pro</h1>
+        <p style="font-size: 1.2rem; color: #8b949e;">Automated Technical Swing Scanner & Algorithmic Alert Engine for Indian Markets (NSE)</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    col1, col2 = st.columns([1, 1])
+    # Feature Metrics Display
+    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+    with col_f1:
+        st.markdown("""<div class="feature-card"><h3>📈 2000+</h3><p style="color:#8b949e">NSE Stocks Scanned Realtime</p></div>""", unsafe_allow_html=True)
+    with col_f2:
+        st.markdown("""<div class="feature-card"><h3>🎯 10 EMA</h3><p style="color:#8b949e">Weekly Support Tracking</p></div>""", unsafe_allow_html=True)
+    with col_f3:
+        st.markdown("""<div class="feature-card"><h3>⚡ Multi-Threaded</h3><p style="color:#8b949e">High-Speed Execution</p></div>""", unsafe_allow_html=True)
+    with col_f4:
+        st.markdown("""<div class="feature-card"><h3>📲 Telegram Sync</h3><p style="color:#8b949e">Direct Mobile Alerts</p></div>""", unsafe_allow_html=True)
 
-    with col1:
-        st.subheader("🔑 Sign In")
-        signin_email = st.text_input("Email (Sign In)", key="si_email")
-        signin_password = st.text_input("Password (Sign In)", type="password", key="si_pass")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-        if st.button("Login to Terminal"):
-            if not signin_email or not signin_password:
-                st.error("Please fill in all fields.")
-            else:
-                try:
-                    res = supabase.auth.sign_in_with_password({
-                        "email": signin_email,
-                        "password": signin_password
-                    })
-                    st.session_state.user = res.user
-                    st.success("Login Successful! Loading terminal...")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Login failed: {e}")
+    # Action Buttons to toggle Login/Register forms
+    col_btn1, col_btn2, _ = st.columns([1, 1, 2])
+    with col_btn1:
+        if st.button("🔑 Sign In to Terminal", use_container_width=True):
+            st.session_state.auth_mode = "login"
+    with col_btn2:
+        if st.button("📝 Register Account", use_container_width=True):
+            st.session_state.auth_mode = "register"
 
-    with col2:
-        st.subheader("📝 Register New Account")
-        signup_email = st.text_input("Email (Register)", key="su_email")
-        signup_password = st.text_input("Password (Register)", type="password", key="su_pass")
+    # Display Dynamic Auth Form Modal
+    if st.session_state.auth_mode == "login":
+        st.markdown("---")
+        with st.form("login_form"):
+            st.subheader("🔑 Sign In")
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            submit = st.form_submit_button("Login")
+            
+            if submit:
+                if not email or not password:
+                    st.error("Please fill in all details.")
+                else:
+                    try:
+                        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        st.session_state.user = res.user
+                        st.success("Access Granted! Loading Terminal...")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Authentication Failed: {e}")
 
-        if st.button("Create Account"):
-            if not signup_email or not signup_password:
-                st.error("Please fill in all fields.")
-            else:
-                try:
-                    res = supabase.auth.sign_up({
-                        "email": signup_email,
-                        "password": signup_password
-                    })
-                    st.success("Account created successfully! You can now log in.")
-                except Exception as e:
-                    st.error(f"Registration failed: {e}")
+    elif st.session_state.auth_mode == "register":
+        st.markdown("---")
+        with st.form("register_form"):
+            st.subheader("📝 Create New Trader Account")
+            email = st.text_input("Email")
+            password = st.text_input("Password (min 6 chars)", type="password")
+            submit = st.form_submit_button("Register")
+            
+            if submit:
+                if not email or not password:
+                    st.error("Please fill in all details.")
+                else:
+                    try:
+                        res = supabase.auth.sign_up({"email": email, "password": password})
+                        st.success("Account created successfully! Click 'Sign In' above to log in.")
+                    except Exception as e:
+                        st.error(f"Registration Failed: {e}")
 
-    st.stop()  # Stop execution here until user logs in
+    st.stop()  # Stop until user authenticates
 
-# --- MAIN APP (AFTER SUCCESSFUL LOGIN) ---
-user_email = st.session_state.user.email if st.session_state.user else "User"
+# --- MAIN TERMINAL (AFTER SUCCESSFUL LOGIN) ---
+user_id = st.session_state.user.id
+user_email = st.session_state.user.email
 
-st.sidebar.write(f"👤 Logged in as: **{user_email}**")
-if st.sidebar.button("🚪 Logout"):
+st.sidebar.markdown(f"👤 **Account:** `{user_email}`")
+
+# Telegram Link Management Section in Sidebar
+with st.sidebar.expander("📲 Telegram Alerts Setup"):
+    st.caption("Link your Telegram Chat ID once to receive instant stock scanner alerts.")
+    telegram_id_input = st.text_input("Enter Telegram Chat ID:", key="tg_id")
+    if st.button("Save Telegram ID"):
+        if telegram_id_input.strip():
+            try:
+                # Save chat ID to user metadata in Supabase
+                supabase.auth.update_user({"data": {"telegram_chat_id": telegram_id_input.strip()}})
+                st.success("Telegram ID Linked Successfully!")
+            except Exception as e:
+                st.error(f"Failed to update: {e}")
+        else:
+            st.warning("Please enter a valid Chat ID.")
+
+    st.markdown("""
+    <small><b>How to get Chat ID?</b><br>
+    1. Search <code>@userinfobot</code> on Telegram.<br>
+    2. Click Start - it will give you your numeric <b>Id</b>.<br>
+    3. Paste that ID here & click Save.</small>
+    """, unsafe_allow_html=True)
+
+if st.sidebar.button("🚪 Logout", use_container_width=True):
     try:
         supabase.auth.sign_out()
     except Exception:
         pass
     st.session_state.user = None
+    st.session_state.auth_mode = None
     st.rerun()
 
 st.sidebar.divider()
 
-def send_welcome_buttons(chat_id):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": "⚡ *Welcome to AlphaScan Pro Terminal Bot!*\n\nAapka account live stock scan alerts ke liye successfully register ho gaya hai.",
-        "parse_mode": "Markdown",
-        "reply_markup": {
-            "inline_keyboard": [
-                [
-                    {"text": "🌐 Open Web Terminal", "url": "https://alphascan-pro.streamlit.app"}
-                ]
-            ]
-        }
-    }
-    try:
-        requests.post(url, json=payload, timeout=5)
-    except Exception:
-        pass
-
-def process_telegram_updates():
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
-    users_dict = {}
-    try:
-        res = requests.get(url, timeout=10)
-        if res.status_code == 200:
-            data = res.json()
-            for result in data.get("result", []):
-                if "message" in result and "chat" in result["message"]:
-                    chat_id = str(result["message"]["chat"]["id"])
-                    text = result["message"].get("text", "")
-                    first_name = result["message"]["chat"].get("first_name", "User")
-                    username = result["message"]["chat"].get("username", "")
-                    
-                    display_name = f"{first_name} (@{username})" if username else f"{first_name} ({chat_id})"
-                    users_dict[display_name] = chat_id
-                    
-                    if text == "/start":
-                        send_welcome_buttons(chat_id)
-    except Exception:
-        pass
-    return users_dict
-
-def send_telegram_alert(message, chat_id):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": message}
-    try:
-        res = requests.post(url, json=payload, timeout=10)
-        return res.status_code == 200
-    except Exception:
-        return False
-
+# --- SCANNER LOGIC ---
 def get_all_nse_symbols():
     url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
@@ -197,12 +232,10 @@ def process_single_stock(symbol, buffer_pct):
     try:
         ticker = yf.Ticker(symbol)
         df = ticker.history(period="1y", interval="1wk")
-
         if df.empty or len(df) < 15:
             return None
 
         df["EMA10"] = ta.trend.ema_indicator(close=df["Close"], window=10)
-
         current_close = round(df["Close"].iloc[-1], 2)
         current_low = round(df["Low"].iloc[-1], 2)
         ema10 = round(df["EMA10"].iloc[-1], 2)
@@ -213,9 +246,7 @@ def process_single_stock(symbol, buffer_pct):
         lower_bound = ema10 * (1 - (buffer_pct / 100))
         upper_bound = ema10 * (1 + (buffer_pct / 100))
 
-        if (lower_bound <= current_low <= upper_bound) or (
-            current_low <= ema10 and current_close >= ema10
-        ):
+        if (lower_bound <= current_low <= upper_bound) or (current_low <= ema10 and current_close >= ema10):
             stock_name = symbol.replace(".NS", "")
             diff_pct = round(((current_close - ema10) / ema10) * 100, 2)
             return {
@@ -223,91 +254,41 @@ def process_single_stock(symbol, buffer_pct):
                 "Price (₹)": current_close,
                 "Weekly Low (₹)": current_low,
                 "10 EMA (₹)": ema10,
-                "Distance from EMA (%)": f"{diff_pct}%",
+                "Distance (%)": f"{diff_pct}%",
             }
     except Exception:
         return None
     return None
 
-# App UI Header
-st.title("⚡ AlphaScan Pro Terminal")
-st.caption("Custom Swing Scanner | Weekly 10 EMA Support & Dynamic Parameter Engine")
+# Terminal UI Header
+st.title("⚡ AlphaScan Pro Quantitative Terminal")
+st.caption("Weekly 10 EMA Support Scanner & Multi-threaded Parameter Engine")
 st.divider()
 
-st.sidebar.header("⚙️ Scanner Configurations")
-
-scan_mode = st.sidebar.radio(
-    "Select Scanning Universe:",
-    ["Custom Stocks", "Nifty 50", "Full NSE (2000+ Stocks)"],
-)
-
-buffer_pct = st.sidebar.slider(
-    "10 EMA Tolerance Buffer (%)",
-    min_value=0.5,
-    max_value=3.0,
-    value=2.0,
-    step=0.1,
-)
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("🤖 Telegram Alert Routing")
-
-bot_users = process_telegram_updates()
-
-if bot_users:
-    selected_user = st.sidebar.selectbox(
-        "Select Your Profile (Target Account):",
-        options=list(bot_users.keys()),
-        help="Alerts will be sent ONLY to the selected Telegram user."
-    )
-    target_chat_id = bot_users[selected_user]
-else:
-    st.sidebar.warning("No active users found. Search @RA_TRADERADAR_BOT on Telegram & click START.")
-    target_chat_id = None
+# Configurations
+st.sidebar.header("⚙️ Scanner Settings")
+scan_mode = st.sidebar.radio("Market Universe:", ["Custom Watchlist", "Nifty 50", "Full NSE (2000+ Stocks)"])
+buffer_pct = st.sidebar.slider("10 EMA Tolerance Buffer (%)", 0.5, 3.0, 2.0, 0.1)
 
 symbols_to_scan = []
-
-if scan_mode == "Custom Stocks":
-    custom_input = st.sidebar.text_area(
-        "Enter Stock Tickers (Comma Separated):",
-        "RELIANCE, TATASTEEL, INFY, ICICIBANK, LT, ZOMATO, TATAMOTORS, SBIN",
-    )
-    symbols_to_scan = [
-        f"{s.strip().upper()}.NS"
-        for s in custom_input.split(",")
-        if s.strip() != ""
-    ]
-
+if scan_mode == "Custom Watchlist":
+    custom_input = st.sidebar.text_area("Tickers (Comma Separated):", "RELIANCE, TATASTEEL, INFY, ICICIBANK, LT, ZOMATO")
+    symbols_to_scan = [f"{s.strip().upper()}.NS" for s in custom_input.split(",") if s.strip() != ""]
 elif scan_mode == "Nifty 50":
-    symbols_to_scan = [
-        "ADANIENT.NS", "ADANIPORTS.NS", "APOLLOHOSP.NS", "ASIANPAINT.NS",
-        "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BAJAJFINSV.NS",
-        "BEL.NS", "BPCL.NS", "BHARTIARTL.NS", "BRITANNIA.NS", "CIPLA.NS",
-        "COALINDIA.NS", "DIVISLAB.NS", "DRREDDY.NS", "EICHERMOT.NS",
-        "GRASIM.NS", "HCLTECH.NS", "HDFCBANK.NS", "HDFCLIFE.NS",
-        "HEROMOTOCO.NS", "HINDALCO.NS", "HINDUNILVR.NS", "ICICIBANK.NS",
-        "ITC.NS", "INDUSINDBK.NS", "INFY.NS", "JSWSTEEL.NS", "KOTAKBANK.NS",
-        "LT.NS", "LTIM.NS", "M&M.NS", "MARUTI.NS", "NTPC.NS", "NESTLEIND.NS",
-        "ONGC.NS", "POWERGRID.NS", "RELIANCE.NS", "SBILIFE.NS",
-        "SHRIRAMFIN.NS", "SBIN.NS", "SUNPHARMA.NS", "TATASTEEL.NS",
-        "TATAMOTORS.NS", "TCS.NS", "TECHM.NS", "TITAN.NS", "ULTRACEMCO.NS", "WIPRO.NS",
-    ]
+    symbols_to_scan = ["ADANIENT.NS", "ADANIPORTS.NS", "ASIANPAINT.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "ITC.NS", "LT.NS", "RELIANCE.NS", "SBIN.NS", "TCS.NS", "TITAN.NS"]
 else:
     symbols_to_scan = get_all_nse_symbols()
 
-if st.sidebar.button("🚀 Execute Scan"):
+if st.sidebar.button("🚀 Run Live Scan", use_container_width=True):
     if not symbols_to_scan:
-        st.sidebar.error("Please add stocks or select a market universe.")
+        st.sidebar.error("Please add stocks to scan.")
     else:
-        st.info(f"Scanning {len(symbols_to_scan)} stocks... Please wait.")
+        st.info(f"Scanning {len(symbols_to_scan)} stocks concurrently...")
         progress_bar = st.progress(0)
         results = []
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-            futures = {
-                executor.submit(process_single_stock, sym, buffer_pct): sym
-                for sym in symbols_to_scan
-            }
+            futures = {executor.submit(process_single_stock, sym, buffer_pct): sym for sym in symbols_to_scan}
             completed = 0
             for future in concurrent.futures.as_completed(futures):
                 res = future.result()
@@ -316,51 +297,42 @@ if st.sidebar.button("🚀 Execute Scan"):
                 completed += 1
                 progress_bar.progress(completed / len(symbols_to_scan))
 
-        if results:
-            st.session_state.scan_results = pd.DataFrame(results)
-            st.success("Analysis Complete!")
-        else:
-            st.session_state.scan_results = pd.DataFrame()
-            st.warning("No setup triggers matching your exact criteria.")
+        st.session_state.scan_results = pd.DataFrame(results) if results else pd.DataFrame()
+        st.success("Scan Execution Complete!")
 
-if (
-    st.session_state.scan_results is not None
-    and not st.session_state.scan_results.empty
-):
+# Results Render
+if st.session_state.scan_results is not None and not st.session_state.scan_results.empty:
     df_res = st.session_state.scan_results
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Setups Found", len(df_res))
-    with col2:
-        st.metric("Selected Strategy", "Weekly 10 EMA Support")
-    with col3:
-        st.metric("EMA Buffer", f"±{buffer_pct}%")
+    col_m1, col_m2, col_m3 = st.columns(3)
+    col_m1.metric("Setups Identified", len(df_res))
+    col_m2.metric("Scan Strategy", "Weekly 10 EMA Support")
+    col_m3.metric("Tolerance Buffer", f"±{buffer_pct}%")
 
-    st.subheader("🎯 Setup Candidates")
+    st.subheader("🎯 Active Swing Candidates")
     st.dataframe(df_res, use_container_width=True)
 
-    if st.button("📲 Push Alerts to Telegram"):
-        if not target_chat_id:
-            st.error("No target user selected! Please select your profile in the sidebar.")
+    # Telegram Alert Button using account linked chat_id
+    saved_chat_id = st.session_state.user.user_metadata.get("telegram_chat_id", "") if st.session_state.user.user_metadata else ""
+
+    if st.button("📲 Push Alerts to My Telegram"):
+        if not saved_chat_id:
+            st.error("Telegram Chat ID not linked! Please link your ID from the sidebar settings first.")
         else:
             matches_text = [
-                f"• {row['Stock']}: Price Rs.{row['Price (₹)']} | 10 EMA Rs.{row['10 EMA (₹)']} ({row['Distance from EMA (%)']})"
+                f"• *{row['Stock']}*: Price Rs.{row['Price (₹)']} | 10 EMA Rs.{row['10 EMA (₹)']} ({row['Distance (%)']})"
                 for _, row in df_res.iterrows()
             ]
 
             total_sent = 0
             for i in range(0, len(matches_text), 15):
                 chunk = matches_text[i : i + 15]
-                msg = (
-                    f"⚡ ALPHASCAN PRO ALERTS (Part {i//15 + 1})\n\n"
-                    + "\n".join(chunk)
-                )
-                if send_telegram_alert(msg, target_chat_id):
+                msg = f"⚡ *ALPHASCAN PRO ALERTS*\n\n" + "\n".join(chunk)
+                if send_telegram_alert(msg, saved_chat_id):
                     total_sent += 1
-                time.sleep(0.5)
+                time.sleep(0.4)
 
             if total_sent > 0:
-                st.success(f"✅ Telegram Alerts Dispatched exclusively to {selected_user}!")
+                st.success("✅ Setups dispatched to your linked Telegram account!")
             else:
-                st.error("❌ Failed to send Telegram message.")
+                st.error("❌ Failed to send alert. Check if Chat ID is correct.")
