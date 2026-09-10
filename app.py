@@ -3,6 +3,7 @@ import time
 import pandas as pd
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 import ta
 import yfinance as yf
 from supabase import create_client, Client
@@ -25,183 +26,165 @@ supabase = init_supabase()
 
 # --- PAGE CONFIG ---
 st.set_page_config(
-    page_title="AlphaScan Pro | Quant Terminal",
+    page_title="AlphaScan Terminal",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# --- ADVANCED DESIGN SYSTEM & INJECTED CSS ---
+# --- MODERN FUTURISTIC CSS DESIGN SYSTEM ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-    /* Global CSS Variables & Overrides */
     :root {
-        --bg-main: #080A0F;
-        --bg-card: #12161F;
-        --bg-card-hover: #1A202C;
-        --border-color: #212836;
-        --border-color-active: #38445D;
-        --accent-green: #00E676;
-        --accent-cyan: #00E5FF;
-        --text-primary: #F0F6FC;
-        --text-secondary: #8B949E;
-        --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        --font-mono: 'JetBrains Mono', monospace;
+        --bg-core: #05070A;
+        --surface-1: rgba(15, 20, 31, 0.6);
+        --surface-2: rgba(23, 30, 46, 0.7);
+        --border-glass: rgba(255, 255, 255, 0.08);
+        --border-glass-hover: rgba(0, 229, 255, 0.3);
+        --accent-glow: #00E5FF;
+        --accent-green: #10B981;
+        --text-main: #F3F4F6;
+        --text-muted: #9CA3AF;
+        --font-sans: 'Plus Jakarta Sans', sans-serif;
+        --font-heading: 'Space Grotesk', sans-serif;
+        --font-code: 'JetBrains Mono', monospace;
     }
 
-    /* Core Application Background & Fonts */
     .stApp {
-        background-color: var(--bg-main) !important;
-        font-family: var(--font-main) !important;
-        color: var(--text-primary);
+        background: radial-gradient(circle at 50% 0%, #0D1527 0%, #05070A 70%) !important;
+        font-family: var(--font-sans) !important;
+        color: var(--text-main);
     }
 
-    /* Hide Unnecessary Streamlit UI Elements */
-    #MainMenu, footer, header {visibility: hidden;}
+    #MainMenu, footer, header { visibility: hidden; }
     .block-container {
-        padding-top: 1.5rem !important;
-        padding-bottom: 2rem !important;
-        max-width: 95% !important;
+        padding: 1.5rem 3rem !important;
+        max-width: 1400px !important;
     }
 
-    /* Typography */
-    h1, h2, h3, h4, h5, h6 {
-        font-family: var(--font-main) !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.02em !important;
-    }
-
-    /* Terminal Navbar & Hero Panels */
-    .terminal-navbar {
+    /* Glass Navbar */
+    .nav-container {
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        padding: 1.25rem 1.75rem;
-        background: linear-gradient(180deg, rgba(18, 22, 31, 0.8) 0%, rgba(12, 15, 22, 0.9) 100%);
-        backdrop-filter: blur(12px);
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        align-items: center;
+        padding: 12px 24px;
+        background: var(--surface-1);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--border-glass);
+        border-radius: 16px;
+        margin-bottom: 2rem;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.4);
     }
 
-    .brand-logo {
-        font-size: 1.5rem;
-        font-weight: 800;
-        background: linear-gradient(90deg, #00E5FF 0%, #00E676 100%);
+    .brand-title {
+        font-family: var(--font-heading);
+        font-size: 1.4rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        background: linear-gradient(135deg, #FFFFFF 0%, #00E5FF 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        letter-spacing: -0.03em;
-    }
-
-    .status-badge {
-        display: inline-flex;
+        display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 4px 12px;
-        border-radius: 20px;
-        background: rgba(0, 230, 118, 0.1);
-        border: 1px solid rgba(0, 230, 118, 0.3);
-        color: var(--accent-green);
-        font-size: 0.8rem;
-        font-weight: 600;
-        font-family: var(--font-mono);
+        gap: 8px;
     }
 
-    .status-dot {
+    .pulse-dot {
         width: 8px;
         height: 8px;
         background-color: var(--accent-green);
         border-radius: 50%;
-        box-shadow: 0 0 8px var(--accent-green);
+        box-shadow: 0 0 12px var(--accent-green);
+        animation: pulse 2s infinite;
     }
 
-    /* Metric Cards Grid */
-    .metric-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: 10px;
-        padding: 1.25rem;
-        transition: all 0.2s ease-in-out;
-    }
-    .metric-card:hover {
-        border-color: var(--border-color-active);
-        transform: translateY(-2px);
-    }
-    .metric-label {
-        font-size: 0.8rem;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-weight: 600;
-    }
-    .metric-value {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: var(--text-primary);
-        font-family: var(--font-mono);
-        margin-top: 4px;
+    @keyframes pulse {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
-    /* Custom Input Fields & Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #0C0F16 !important;
-        border-right: 1px solid var(--border-color) !important;
-    }
-    
-    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stTextArea>div>div>textarea {
-        background-color: #12161F !important;
-        color: var(--text-primary) !important;
-        border: 1px solid var(--border-color) !important;
-        border-radius: 8px !important;
-        font-family: var(--font-mono) !important;
-    }
-
-    .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
-        border-color: var(--accent-cyan) !important;
-        box-shadow: 0 0 0 1px var(--accent-cyan) !important;
-    }
-
-    /* Enterprise Action Buttons */
-    .stButton>button {
-        background: linear-gradient(180deg, #1A2332 0%, #111722 100%) !important;
-        color: var(--text-primary) !important;
-        border: 1px solid var(--border-color-active) !important;
-        border-radius: 8px !important;
-        padding: 0.6rem 1.2rem !important;
-        font-weight: 600 !important;
-        font-size: 0.9rem !important;
-        letter-spacing: 0.02em !important;
-        transition: all 0.2s ease !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
-    }
-    .stButton>button:hover {
-        background: linear-gradient(180deg, #222D40 0%, #161F2E 100%) !important;
-        border-color: var(--accent-cyan) !important;
-        color: var(--accent-cyan) !important;
-        box-shadow: 0 0 12px rgba(0, 229, 255, 0.2) !important;
-    }
-
-    /* Styled Form Containers */
-    div[data-testid="stForm"] {
-        background-color: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        padding: 2rem;
-    }
-
-    /* Dataframe Table Custom Styling */
-    div[data-testid="stDataFrame"] {
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
+    /* Futuristic Interactive Cards */
+    .glow-card {
+        background: var(--surface-1);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--border-glass);
+        border-radius: 14px;
+        padding: 1.5rem;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
         overflow: hidden;
+    }
+
+    .glow-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--border-glass-hover);
+        box-shadow: 0 12px 30px rgba(0, 229, 255, 0.15);
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        font-weight: 600;
+        margin-bottom: 6px;
+    }
+
+    .stat-value {
+        font-family: var(--font-heading);
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    /* Streamlit Button Tweaks for Classy Look */
+    .stButton > button {
+        background: linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%) !important;
+        border: 1px solid var(--border-glass-hover) !important;
+        color: var(--accent-glow) !important;
+        border-radius: 10px !important;
+        padding: 0.6rem 1.5rem !important;
+        font-family: var(--font-sans) !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+    }
+
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #00E5FF 0%, #10B981 100%) !important;
+        color: #000000 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(0, 229, 255, 0.4) !important;
+    }
+
+    /* Clean Form Styling */
+    div[data-testid="stForm"] {
+        background: var(--surface-1) !important;
+        border: 1px solid var(--border-glass) !important;
+        border-radius: 16px !important;
+        padding: 2.5rem !important;
+        backdrop-filter: blur(16px);
+    }
+
+    .stTextInput>div>div>input {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid var(--border-glass) !important;
+        color: var(--text-main) !important;
+        border-radius: 8px !important;
+    }
+
+    .stTextInput>div>div>input:focus {
+        border-color: var(--accent-glow) !important;
+        box-shadow: 0 0 10px rgba(0, 229, 255, 0.2) !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- SESSION STATE MANAGEMENT ---
+# --- SESSION STATE ---
 if "user" not in st.session_state:
     st.session_state.user = None
 if "auth_mode" not in st.session_state:
@@ -211,7 +194,7 @@ if "scan_results" not in st.session_state:
 if "telegram_chat_id" not in st.session_state:
     st.session_state.telegram_chat_id = ""
 
-# --- TELEGRAM UTILS ---
+# --- TELEGRAM HELPER ---
 def send_telegram_alert(message, chat_id):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
@@ -221,119 +204,230 @@ def send_telegram_alert(message, chat_id):
     except Exception:
         return False
 
-# --- LANDING PAGE (UNAUTHENTICATED TERMINAL) ---
+# --- LANDING PAGE (AUTHENTICATION) ---
 if not st.session_state.user:
-    # Top Navbar Design
     st.markdown("""
-        <div class="terminal-navbar">
-            <div class="brand-logo">⚡ ALPHASCAN PRO</div>
-            <div class="status-badge"><span class="status-dot"></span> SYSTEM ONLINE</div>
+        <div class="nav-container">
+            <div class="brand-title">⚡ ALPHASCAN <span style="font-size:0.7rem; color:var(--accent-glow); padding:2px 8px; border:1px solid var(--border-glass-hover); border-radius:12px;">PRO</span></div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:0.85rem; color:var(--text-muted);">
+                <div class="pulse-dot"></div> QUANT NETWORK ACTIVE
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
-    # Hero Intro
     st.markdown("""
-        <div style="text-align: center; margin: 3rem 0;">
-            <h1 style="font-size: 3.2rem; margin-bottom: 0.5rem; background: linear-gradient(180deg, #FFFFFF 0%, #8B949E 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                Institutional Market Intelligence
+        <div style="text-align: center; padding: 4rem 1rem 2rem 1rem;">
+            <h1 style="font-family:var(--font-heading); font-size: 3.5rem; font-weight:700; line-height:1.1; margin-bottom: 1rem; background: linear-gradient(180deg, #FFFFFF 0%, #6B7280 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                Next-Gen Market Intelligence Terminal
             </h1>
-            <p style="color: #8B949E; font-size: 1.15rem; max-width: 700px; margin: 0 auto 2rem auto;">
-                High-frequency technical scanner tracking weekly 10 EMA dynamics across 2,000+ NSE equity markets in real-time.
+            <p style="color: var(--text-muted); font-size: 1.15rem; max-width: 650px; margin: 0 auto 2.5rem auto;">
+                Real-time technical parameter scanning, automated weekly 10 EMA support tracking, and instant multi-channel signal routing.
             </p>
         </div>
     """, unsafe_allow_html=True)
 
-    # Architectural Highlights
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown('<div class="metric-card"><div class="metric-label">Universe Coverage</div><div class="metric-value">2000+</div><small style="color:#8B949E">NSE Equities</small></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown('<div class="metric-card"><div class="metric-label">Algorithm</div><div class="metric-value">10 EMA</div><small style="color:#8B949E">Weekly Support</small></div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown('<div class="metric-card"><div class="metric-label">Execution Engine</div><div class="metric-value">30x</div><small style="color:#8B949E">Thread Pool</small></div>', unsafe_allow_html=True)
-    with col4:
-        st.markdown('<div class="metric-card"><div class="metric-label">Alert Sync</div><div class="metric-value">&lt; 1s</div><small style="color:#8B949E">Telegram Integration</small></div>', unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown('<div class="glow-card"><div class="stat-label">Coverage</div><div class="stat-value">2,000+</div><div style="color:var(--text-muted); font-size:0.8rem;">NSE Equities</div></div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown('<div class="glow-card"><div class="stat-label">Algorithm</div><div class="stat-value">10 EMA</div><div style="color:var(--text-muted); font-size:0.8rem;">Weekly Support</div></div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown('<div class="glow-card"><div class="stat-label">Execution</div><div class="stat-value">Parallel</div><div style="color:var(--text-muted); font-size:0.8rem;">30x Threads</div></div>', unsafe_allow_html=True)
+    with c4:
+        st.markdown('<div class="glow-card"><div class="stat-label">Latency</div><div class="stat-value">&lt; 0.5s</div><div style="color:var(--text-muted); font-size:0.8rem;">Alert Dispatch</div></div>', unsafe_allow_html=True)
 
     st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # Authentication Triggers
-    c_btn1, c_btn2, _ = st.columns([1, 1, 2])
-    with c_btn1:
-        if st.button("🔑 Access Terminal (Sign In)", use_container_width=True):
+    col_btn1, col_btn2, _ = st.columns([1, 1, 2])
+    with col_btn1:
+        if st.button("🔑 Enter Terminal", use_container_width=True):
             st.session_state.auth_mode = "login"
-    with c_btn2:
-        if st.button("📝 Register Account", use_container_width=True):
+    with col_btn2:
+        if st.button("📝 Create Account", use_container_width=True):
             st.session_state.auth_mode = "register"
 
-    # Authentication Form Render
     if st.session_state.auth_mode == "login":
         st.markdown("<br>", unsafe_allow_html=True)
         with st.form("login_form"):
-            st.subheader("🔑 Terminal Authentication")
-            email = st.text_input("Trader Identification (Email)")
-            password = st.text_input("Access Security Token (Password)", type="password")
-            submit = st.form_submit_button("Authenticate")
-            
-            if submit:
-                if not email or not password:
-                    st.error("Authentication parameters incomplete.")
-                else:
-                    try:
-                        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                        st.session_state.user = res.user
-                        if res.user and res.user.user_metadata:
-                            st.session_state.telegram_chat_id = res.user.user_metadata.get("telegram_chat_id", "")
-                        st.success("Session Authorized. Initializing Terminal...")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Authentication Failed: {e}")
+            st.subheader("🔑 Sign In to Terminal")
+            email = st.text_input("Account Email")
+            password = st.text_input("Password", type="password")
+            if st.form_submit_button("Authenticate"):
+                try:
+                    res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    st.session_state.user = res.user
+                    if res.user and res.user.user_metadata:
+                        st.session_state.telegram_chat_id = res.user.user_metadata.get("telegram_chat_id", "")
+                    st.success("Authorized! Loading terminal...")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
     elif st.session_state.auth_mode == "register":
         st.markdown("<br>", unsafe_allow_html=True)
         with st.form("register_form"):
-            st.subheader("📝 Request Access Credentials")
-            email = st.text_input("Primary Email")
-            password = st.text_input("Set Security Token (Min 6 chars)", type="password")
-            submit = st.form_submit_button("Create Terminal Profile")
-            
-            if submit:
-                if not email or not password:
-                    st.error("Please fill in all parameter fields.")
-                else:
-                    try:
-                        res = supabase.auth.sign_up({"email": email, "password": password})
-                        st.success("Profile created! Authenticate above to continue.")
-                    except Exception as e:
-                        st.error(f"Registration Failed: {e}")
+            st.subheader("📝 Register Trader Profile")
+            email = st.text_input("Email Address")
+            password = st.text_input("Password (min 6 characters)", type="password")
+            if st.form_submit_button("Create Account"):
+                try:
+                    res = supabase.auth.sign_up({"email": email, "password": password})
+                    st.success("Account created successfully! Click 'Enter Terminal' above.")
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
     st.stop()
 
-# --- MAIN QUANT TERMINAL (AUTHENTICATED SESSION) ---
+# --- AUTHENTICATED TERMINAL DASHBOARD ---
 user_email = st.session_state.user.email
 
-# Navbar Header
 st.markdown(f"""
-    <div class="terminal-navbar">
-        <div class="brand-logo">⚡ ALPHASCAN PRO <span style="font-size: 0.8rem; color: #8B949E; font-family: var(--font-mono);">[v2.4 QUANT ENGINE]</span></div>
-        <div class="status-badge"><span class="status-dot"></span> LINKED: {user_email}</div>
+    <div class="nav-container">
+        <div class="brand-title">⚡ ALPHASCAN PRO</div>
+        <div style="display:flex; align-items:center; gap:20px;">
+            <span style="color:var(--text-muted); font-size:0.9rem;">Connected: <b style="color:var(--text-main);">{user_email}</b></span>
+            <div class="pulse-dot"></div>
+        </div>
     </div>
 """, unsafe_allow_html=True)
 
-# Sidebar Configuration
-st.sidebar.markdown("<h3 style='margin-bottom: 0;'>⚙️ Control Panel</h3>", unsafe_allow_html=True)
-st.sidebar.caption("Execution parameters & routing")
-st.sidebar.markdown("---")
+# Main Navigation Tabs
+tab1, tab2, tab3 = st.tabs(["📊 Terminal & Scanner", "📲 Routing & Settings", "📈 Interactive Chart View"])
 
-# Fetch Chat ID from Session or Metadata
-if not st.session_state.telegram_chat_id and st.session_state.user and st.session_state.user.user_metadata:
-    st.session_state.telegram_chat_id = st.session_state.user.user_metadata.get("telegram_chat_id", "")
+# --- TAB 1: TERMINAL SCANNER ---
+with tab1:
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_config, c_results = st.columns([1, 2.5])
 
-# Telegram Setup Component
-with st.sidebar.expander("📲 Telegram Routing Configuration", expanded=not bool(st.session_state.telegram_chat_id)):
-    current_val = st.session_state.telegram_chat_id
-    telegram_id_input = st.text_input("Telegram Chat ID:", value=current_val, key="tg_id")
+    with c_config:
+        st.markdown('<div class="glow-card">', unsafe_allow_html=True)
+        st.subheader("⚙️ Control Engine")
+        scan_mode = st.radio("Market Universe", ["Custom Watchlist", "Nifty 50", "Full NSE (2000+ Stocks)"])
+        buffer_pct = st.slider("10 EMA Tolerance Buffer (%)", 0.5, 3.0, 2.0, 0.1)
+
+        symbols_to_scan = []
+        if scan_mode == "Custom Watchlist":
+            custom_input = st.text_area("Watchlist Tickers", "RELIANCE, TATASTEEL, INFY, ICICIBANK, LT, ZOMATO")
+            symbols_to_scan = [f"{s.strip().upper()}.NS" for s in custom_input.split(",") if s.strip() != ""]
+        elif scan_mode == "Nifty 50":
+            symbols_to_scan = ["ADANIENT.NS", "ADANIPORTS.NS", "ASIANPAINT.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "ITC.NS", "LT.NS", "RELIANCE.NS", "SBIN.NS", "TCS.NS", "TITAN.NS"]
+        else:
+            def get_all_nse_symbols():
+                url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
+                headers = {"User-Agent": "Mozilla/5.0"}
+                try:
+                    response = requests.get(url, headers=headers)
+                    if response.status_code == 200:
+                        with open("EQUITY_L.csv", "wb") as f:
+                            f.write(response.content)
+                        df = pd.read_csv("EQUITY_L.csv")
+                        df = df[df[" SERIES"] == "EQ"]
+                        return [f"{symbol.strip()}.NS" for symbol in df["SYMBOL"]]
+                except Exception:
+                    pass
+                return ["RELIANCE.NS", "TATASTEEL.NS", "INFY.NS", "ICICIBANK.NS", "LT.NS"]
+            symbols_to_scan = get_all_nse_symbols()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        run_scan = st.button("🚀 Run Live Scanner", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with c_results:
+        def process_single_stock(symbol, buffer_pct):
+            try:
+                ticker = yf.Ticker(symbol)
+                df = ticker.history(period="1y", interval="1wk")
+                if df.empty or len(df) < 15:
+                    return None
+
+                df["EMA10"] = ta.trend.ema_indicator(close=df["Close"], window=10)
+                current_close = round(df["Close"].iloc[-1], 2)
+                current_low = round(df["Low"].iloc[-1], 2)
+                ema10 = round(df["EMA10"].iloc[-1], 2)
+
+                if current_close < 5:
+                    return None
+
+                lower_bound = ema10 * (1 - (buffer_pct / 100))
+                upper_bound = ema10 * (1 + (buffer_pct / 100))
+
+                if (lower_bound <= current_low <= upper_bound) or (current_low <= ema10 and current_close >= ema10):
+                    stock_name = symbol.replace(".NS", "")
+                    diff_pct = round(((current_close - ema10) / ema10) * 100, 2)
+                    return {
+                        "Ticker": stock_name,
+                        "LTP (₹)": current_close,
+                        "Weekly Low (₹)": current_low,
+                        "10 EMA (₹)": ema10,
+                        "Spread (%)": f"{diff_pct}%",
+                    }
+            except Exception:
+                return None
+            return None
+
+        if run_scan:
+            st.info(f"Scanning {len(symbols_to_scan)} stock symbols...")
+            progress_bar = st.progress(0)
+            results = []
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+                futures = {executor.submit(process_single_stock, sym, buffer_pct): sym for sym in symbols_to_scan}
+                completed = 0
+                for future in concurrent.futures.as_completed(futures):
+                    res = future.result()
+                    if res:
+                        results.append(res)
+                    completed += 1
+                    progress_bar.progress(completed / len(symbols_to_scan))
+
+            st.session_state.scan_results = pd.DataFrame(results) if results else pd.DataFrame()
+
+        if st.session_state.scan_results is not None:
+            df_res = st.session_state.scan_results
+
+            r1, r2 = st.columns([1, 1])
+            r1.markdown(f'<div class="glow-card"><div class="stat-label">Identified Matches</div><div class="stat-value" style="color:var(--accent-green);">{len(df_res)}</div></div>', unsafe_allow_html=True)
+            r2.markdown(f'<div class="glow-card"><div class="stat-label">Current Buffer</div><div class="stat-value">±{buffer_pct}%</div></div>', unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            if not df_res.empty:
+                st.dataframe(df_res, use_container_width=True)
+
+                if st.button("📲 Dispatch Signals to Telegram Bot"):
+                    active_chat_id = st.session_state.telegram_chat_id
+                    if not active_chat_id:
+                        st.error("Telegram Chat ID missing! Configure it in 'Routing & Settings' tab.")
+                    else:
+                        matches_text = [
+                            f"• *{row['Ticker']}*: LTP Rs.{row['LTP (₹)']} | 10 EMA Rs.{row['10 EMA (₹)']} ({row['Spread (%)']})"
+                            for _, row in df_res.iterrows()
+                        ]
+                        total_sent = 0
+                        for i in range(0, len(matches_text), 15):
+                            chunk = matches_text[i : i + 15]
+                            msg = f"⚡ *ALPHASCAN QUANT SIGNALS*\n\n" + "\n".join(chunk)
+                            if send_telegram_alert(msg, active_chat_id):
+                                total_sent += 1
+                            time.sleep(0.4)
+
+                        if total_sent > 0:
+                            st.success("Signals sent to Telegram successfully!")
+                        else:
+                            st.error("Alert delivery failed.")
+            else:
+                st.warning("No setup triggers matched the criteria.")
+
+# --- TAB 2: ROUTING & SETTINGS ---
+with tab2:
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="glow-card" style="max-width: 600px; margin: 0 auto;">', unsafe_allow_html=True)
+    st.subheader("📲 Telegram Routing Configuration")
     
-    if st.button("Save Chat ID", use_container_width=True):
+    current_val = st.session_state.telegram_chat_id
+    telegram_id_input = st.text_input("Telegram Chat ID:", value=current_val)
+
+    if st.button("Save Chat ID"):
         clean_id = telegram_id_input.strip()
         if clean_id:
             try:
@@ -341,150 +435,64 @@ with st.sidebar.expander("📲 Telegram Routing Configuration", expanded=not boo
                 if res.user:
                     st.session_state.user = res.user
                 st.session_state.telegram_chat_id = clean_id
-                st.success("✅ Endpoint Saved!")
+                st.success("✅ Chat ID Linked & Saved!")
                 st.rerun()
             except Exception as e:
                 st.error(f"Save error: {e}")
         else:
-            st.warning("Provide a valid numeric Chat ID.")
+            st.warning("Please provide a valid Chat ID.")
 
-    st.caption("Obtain Chat ID from `@userinfobot`. Ensure you trigger `/start` on your dedicated Alert Bot.")
+    st.markdown("""
+    <p style="color:var(--text-muted); font-size:0.85rem; margin-top:1rem;">
+    1. Search <code>@userinfobot</code> on Telegram to get your numeric ID.<br>
+    2. Paste it here and click Save.<br>
+    3. Ensure you click <b>/start</b> on your alert bot once.
+    </p>
+    """, unsafe_allow_html=True)
 
-st.sidebar.markdown("---")
-
-# Scanner Core Parameters
-scan_mode = st.sidebar.radio("Market Universe:", ["Custom Watchlist", "Nifty 50", "Full NSE (2000+ Stocks)"])
-buffer_pct = st.sidebar.slider("10 EMA Buffer Range (%)", 0.5, 3.0, 2.0, 0.1)
-
-symbols_to_scan = []
-if scan_mode == "Custom Watchlist":
-    custom_input = st.sidebar.text_area("Tickers (Comma Separated):", "RELIANCE, TATASTEEL, INFY, ICICIBANK, LT, ZOMATO")
-    symbols_to_scan = [f"{s.strip().upper()}.NS" for s in custom_input.split(",") if s.strip() != ""]
-elif scan_mode == "Nifty 50":
-    symbols_to_scan = ["ADANIENT.NS", "ADANIPORTS.NS", "ASIANPAINT.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "ITC.NS", "LT.NS", "RELIANCE.NS", "SBIN.NS", "TCS.NS", "TITAN.NS"]
-else:
-    def get_all_nse_symbols():
-        url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
-        headers = {"User-Agent": "Mozilla/5.0"}
+    st.markdown("<hr style='border-color:var(--border-glass);'>", unsafe_allow_html=True)
+    if st.button("🚪 Logout Account", use_container_width=True):
         try:
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                with open("EQUITY_L.csv", "wb") as f:
-                    f.write(response.content)
-                df = pd.read_csv("EQUITY_L.csv")
-                df = df[df[" SERIES"] == "EQ"]
-                return [f"{symbol.strip()}.NS" for symbol in df["SYMBOL"]]
+            supabase.auth.sign_out()
         except Exception:
             pass
-        return ["RELIANCE.NS", "TATASTEEL.NS", "INFY.NS", "ICICIBANK.NS", "LT.NS"]
-    symbols_to_scan = get_all_nse_symbols()
+        st.session_state.user = None
+        st.session_state.auth_mode = None
+        st.session_state.telegram_chat_id = ""
+        st.rerun()
+        
+    st.markdown('</div>', unsafe_allow_html=True)
 
-st.sidebar.markdown("---")
-if st.sidebar.button("🚪 Terminate Session", use_container_width=True):
-    try:
-        supabase.auth.sign_out()
-    except Exception:
-        pass
-    st.session_state.user = None
-    st.session_state.auth_mode = None
-    st.session_state.telegram_chat_id = ""
-    st.rerun()
-
-# --- SCANNER ALGORITHM ---
-def process_single_stock(symbol, buffer_pct):
-    try:
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(period="1y", interval="1wk")
-        if df.empty or len(df) < 15:
-            return None
-
-        df["EMA10"] = ta.trend.ema_indicator(close=df["Close"], window=10)
-        current_close = round(df["Close"].iloc[-1], 2)
-        current_low = round(df["Low"].iloc[-1], 2)
-        ema10 = round(df["EMA10"].iloc[-1], 2)
-
-        if current_close < 5:
-            return None
-
-        lower_bound = ema10 * (1 - (buffer_pct / 100))
-        upper_bound = ema10 * (1 + (buffer_pct / 100))
-
-        if (lower_bound <= current_low <= upper_bound) or (current_low <= ema10 and current_close >= ema10):
-            stock_name = symbol.replace(".NS", "")
-            diff_pct = round(((current_close - ema10) / ema10) * 100, 2)
-            return {
-                "Ticker": stock_name,
-                "LTP (₹)": current_close,
-                "Weekly Low (₹)": current_low,
-                "10 EMA (₹)": ema10,
-                "Spread (%)": f"{diff_pct}%",
-            }
-    except Exception:
-        return None
-    return None
-
-# Execution Triggers
-if st.sidebar.button("🚀 Run Live Scanner Engine", use_container_width=True):
-    if not symbols_to_scan:
-        st.sidebar.error("Select market parameters.")
-    else:
-        st.info(f"Executing parallel scan across {len(symbols_to_scan)} market symbols...")
-        progress_bar = st.progress(0)
-        results = []
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-            futures = {executor.submit(process_single_stock, sym, buffer_pct): sym for sym in symbols_to_scan}
-            completed = 0
-            for future in concurrent.futures.as_completed(futures):
-                res = future.result()
-                if res:
-                    results.append(res)
-                completed += 1
-                progress_bar.progress(completed / len(symbols_to_scan))
-
-        st.session_state.scan_results = pd.DataFrame(results) if results else pd.DataFrame()
-        st.success("Scan Routine Execution Complete.")
-
-# Terminal Results Render
-if st.session_state.scan_results is not None:
-    df_res = st.session_state.scan_results
-    
-    m1, m2, m3 = st.columns(3)
-    with m1:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">Matches Found</div><div class="metric-value" style="color:var(--accent-green);">{len(df_res)}</div></div>', unsafe_allow_html=True)
-    with m2:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">Selected Strategy</div><div class="metric-value">Weekly EMA</div></div>', unsafe_allow_html=True)
-    with m3:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">Tolerance Buffer</div><div class="metric-value">±{buffer_pct}%</div></div>', unsafe_allow_html=True)
-
+# --- TAB 3: TRADINGVIEW INTERACTIVE CHART ENGINE ---
+with tab3:
     st.markdown("<br>", unsafe_allow_html=True)
-
-    if not df_res.empty:
-        st.subheader("🎯 Identified Setup Candidates")
-        st.dataframe(df_res, use_container_width=True)
-
-        active_chat_id = st.session_state.telegram_chat_id
-
-        if st.button("📲 Push Signals to Telegram Bot"):
-            if not active_chat_id:
-                st.error("Telegram Chat ID unconfigured. Save your Chat ID in the Control Panel first.")
-            else:
-                matches_text = [
-                    f"• *{row['Ticker']}*: LTP Rs.{row['LTP (₹)']} | 10 EMA Rs.{row['10 EMA (₹)']} ({row['Spread (%)']})"
-                    for _, row in df_res.iterrows()
-                ]
-
-                total_sent = 0
-                for i in range(0, len(matches_text), 15):
-                    chunk = matches_text[i : i + 15]
-                    msg = f"⚡ *ALPHASCAN QUANT SIGNALS*\n\n" + "\n".join(chunk)
-                    if send_telegram_alert(msg, active_chat_id):
-                        total_sent += 1
-                    time.sleep(0.4)
-
-                if total_sent > 0:
-                    st.success(" Signals dispatched successfully to your linked bot endpoint.")
-                else:
-                    st.error("Delivery failed. Ensure your bot has received a `/start` command.")
-    else:
-        st.warning("No tickers met the technical criteria during this scan run.")
+    chart_symbol = st.text_input("Enter NSE Ticker Symbol for Real-time Chart:", value="RELIANCE").upper().strip()
+    
+    st.markdown(f"### 📈 Realtime Market Chart: `{chart_symbol}`")
+    
+    # TradingView Widget Embed Component
+    tv_widget_html = f"""
+    <div class="tradingview-widget-container" style="height:600px;width:100%;">
+      <div id="tradingview_chart" style="height:calc(100% - 32px);width:100%;"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget(
+      {{
+      "autosize": true,
+      "symbol": "NSE:{chart_symbol}",
+      "interval": "W",
+      "timezone": "Asia/Kolkata",
+      "theme": "dark",
+      "style": "1",
+      "locale": "en",
+      "toolbar_bg": "#f1f3f6",
+      "enable_publishing": false,
+      "hide_legend": false,
+      "save_image": false,
+      "container_id": "tradingview_chart"
+    }}
+      );
+      </script>
+    </div>
+    """
+    components.html(tv_widget_html, height=620)
