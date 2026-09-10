@@ -23,7 +23,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- PAGE CONFIG & CUSTOM STYLING ---
+# --- PAGE CONFIG ---
 st.set_page_config(
     page_title="AlphaScan Pro | Quant Terminal",
     page_icon="⚡",
@@ -31,49 +31,172 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- ADVANCED DESIGN SYSTEM & INJECTED CSS ---
 st.markdown("""
 <style>
-    .stApp {
-        background-color: #0b0e14;
-        color: #e6edf3;
-    }
-    
-    .hero-card {
-        background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
-        border: 1px solid #30363d;
-        border-radius: 12px;
-        padding: 30px;
-        margin-bottom: 25px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    }
-    
-    .feature-card {
-        background-color: #161b22;
-        border: 1px solid #21262d;
-        border-radius: 8px;
-        padding: 20px;
-        text-align: center;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    /* Global CSS Variables & Overrides */
+    :root {
+        --bg-main: #080A0F;
+        --bg-card: #12161F;
+        --bg-card-hover: #1A202C;
+        --border-color: #212836;
+        --border-color-active: #38445D;
+        --accent-green: #00E676;
+        --accent-cyan: #00E5FF;
+        --text-primary: #F0F6FC;
+        --text-secondary: #8B949E;
+        --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        --font-mono: 'JetBrains Mono', monospace;
     }
 
-    .stButton>button {
-        background-color: #238636;
-        color: #ffffff;
-        border-radius: 6px;
-        border: 1px solid rgba(240,246,252,0.1);
-        padding: 10px 20px;
-        font-weight: 600;
-        transition: all 0.2s ease;
+    /* Core Application Background & Fonts */
+    .stApp {
+        background-color: var(--bg-main) !important;
+        font-family: var(--font-main) !important;
+        color: var(--text-primary);
     }
-    .stButton>button:hover {
-        background-color: #2ea043;
-        border-color: #8b949e;
+
+    /* Hide Unnecessary Streamlit UI Elements */
+    #MainMenu, footer, header {visibility: hidden;}
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 95% !important;
+    }
+
+    /* Typography */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-main) !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.02em !important;
+    }
+
+    /* Terminal Navbar & Hero Panels */
+    .terminal-navbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem 1.75rem;
+        background: linear-gradient(180deg, rgba(18, 22, 31, 0.8) 0%, rgba(12, 15, 22, 0.9) 100%);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    .brand-logo {
+        font-size: 1.5rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #00E5FF 0%, #00E676 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: -0.03em;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        background: rgba(0, 230, 118, 0.1);
+        border: 1px solid rgba(0, 230, 118, 0.3);
+        color: var(--accent-green);
+        font-size: 0.8rem;
+        font-weight: 600;
+        font-family: var(--font-mono);
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        background-color: var(--accent-green);
+        border-radius: 50%;
+        box-shadow: 0 0 8px var(--accent-green);
+    }
+
+    /* Metric Cards Grid */
+    .metric-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 1.25rem;
+        transition: all 0.2s ease-in-out;
+    }
+    .metric-card:hover {
+        border-color: var(--border-color-active);
+        transform: translateY(-2px);
+    }
+    .metric-label {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+        margin-top: 4px;
+    }
+
+    /* Custom Input Fields & Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #0C0F16 !important;
+        border-right: 1px solid var(--border-color) !important;
     }
     
+    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stTextArea>div>div>textarea {
+        background-color: #12161F !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 8px !important;
+        font-family: var(--font-mono) !important;
+    }
+
+    .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
+        border-color: var(--accent-cyan) !important;
+        box-shadow: 0 0 0 1px var(--accent-cyan) !important;
+    }
+
+    /* Enterprise Action Buttons */
+    .stButton>button {
+        background: linear-gradient(180deg, #1A2332 0%, #111722 100%) !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--border-color-active) !important;
+        border-radius: 8px !important;
+        padding: 0.6rem 1.2rem !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        letter-spacing: 0.02em !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    }
+    .stButton>button:hover {
+        background: linear-gradient(180deg, #222D40 0%, #161F2E 100%) !important;
+        border-color: var(--accent-cyan) !important;
+        color: var(--accent-cyan) !important;
+        box-shadow: 0 0 12px rgba(0, 229, 255, 0.2) !important;
+    }
+
+    /* Styled Form Containers */
     div[data-testid="stForm"] {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 10px;
-        padding: 20px;
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 2rem;
+    }
+
+    /* Dataframe Table Custom Styling */
+    div[data-testid="stDataFrame"] {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -98,119 +221,166 @@ def send_telegram_alert(message, chat_id):
     except Exception:
         return False
 
-# --- LANDING PAGE (UNAUTHENTICATED) ---
+# --- LANDING PAGE (UNAUTHENTICATED TERMINAL) ---
 if not st.session_state.user:
+    # Top Navbar Design
     st.markdown("""
-    <div class="hero-card">
-        <h1 style="color: #58a6ff; font-size: 2.8rem; margin-bottom: 5px;">⚡ AlphaScan Pro</h1>
-        <p style="font-size: 1.2rem; color: #8b949e;">Automated Technical Swing Scanner & Algorithmic Alert Engine for Indian Markets (NSE)</p>
-    </div>
+        <div class="terminal-navbar">
+            <div class="brand-logo">⚡ ALPHASCAN PRO</div>
+            <div class="status-badge"><span class="status-dot"></span> SYSTEM ONLINE</div>
+        </div>
     """, unsafe_allow_html=True)
 
-    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
-    with col_f1:
-        st.markdown("""<div class="feature-card"><h3>📈 2000+</h3><p style="color:#8b949e">NSE Stocks Scanned Realtime</p></div>""", unsafe_allow_html=True)
-    with col_f2:
-        st.markdown("""<div class="feature-card"><h3>🎯 10 EMA</h3><p style="color:#8b949e">Weekly Support Tracking</p></div>""", unsafe_allow_html=True)
-    with col_f3:
-        st.markdown("""<div class="feature-card"><h3>⚡ Multi-Threaded</h3><p style="color:#8b949e">High-Speed Execution</p></div>""", unsafe_allow_html=True)
-    with col_f4:
-        st.markdown("""<div class="feature-card"><h3>📲 Telegram Sync</h3><p style="color:#8b949e">Direct Mobile Alerts</p></div>""", unsafe_allow_html=True)
+    # Hero Intro
+    st.markdown("""
+        <div style="text-align: center; margin: 3rem 0;">
+            <h1 style="font-size: 3.2rem; margin-bottom: 0.5rem; background: linear-gradient(180deg, #FFFFFF 0%, #8B949E 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                Institutional Market Intelligence
+            </h1>
+            <p style="color: #8B949E; font-size: 1.15rem; max-width: 700px; margin: 0 auto 2rem auto;">
+                High-frequency technical scanner tracking weekly 10 EMA dynamics across 2,000+ NSE equity markets in real-time.
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    # Architectural Highlights
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown('<div class="metric-card"><div class="metric-label">Universe Coverage</div><div class="metric-value">2000+</div><small style="color:#8B949E">NSE Equities</small></div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown('<div class="metric-card"><div class="metric-label">Algorithm</div><div class="metric-value">10 EMA</div><small style="color:#8B949E">Weekly Support</small></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown('<div class="metric-card"><div class="metric-label">Execution Engine</div><div class="metric-value">30x</div><small style="color:#8B949E">Thread Pool</small></div>', unsafe_allow_html=True)
+    with col4:
+        st.markdown('<div class="metric-card"><div class="metric-label">Alert Sync</div><div class="metric-value">&lt; 1s</div><small style="color:#8B949E">Telegram Integration</small></div>', unsafe_allow_html=True)
 
-    col_btn1, col_btn2, _ = st.columns([1, 1, 2])
-    with col_btn1:
-        if st.button("🔑 Sign In to Terminal", use_container_width=True):
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
+    # Authentication Triggers
+    c_btn1, c_btn2, _ = st.columns([1, 1, 2])
+    with c_btn1:
+        if st.button("🔑 Access Terminal (Sign In)", use_container_width=True):
             st.session_state.auth_mode = "login"
-    with col_btn2:
+    with c_btn2:
         if st.button("📝 Register Account", use_container_width=True):
             st.session_state.auth_mode = "register"
 
+    # Authentication Form Render
     if st.session_state.auth_mode == "login":
-        st.markdown("---")
+        st.markdown("<br>", unsafe_allow_html=True)
         with st.form("login_form"):
-            st.subheader("🔑 Sign In")
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Login")
+            st.subheader("🔑 Terminal Authentication")
+            email = st.text_input("Trader Identification (Email)")
+            password = st.text_input("Access Security Token (Password)", type="password")
+            submit = st.form_submit_button("Authenticate")
             
             if submit:
                 if not email or not password:
-                    st.error("Please fill in all details.")
+                    st.error("Authentication parameters incomplete.")
                 else:
                     try:
                         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
                         st.session_state.user = res.user
-                        # Load existing metadata Chat ID if present
                         if res.user and res.user.user_metadata:
                             st.session_state.telegram_chat_id = res.user.user_metadata.get("telegram_chat_id", "")
-                        st.success("Access Granted! Loading Terminal...")
+                        st.success("Session Authorized. Initializing Terminal...")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Authentication Failed: {e}")
 
     elif st.session_state.auth_mode == "register":
-        st.markdown("---")
+        st.markdown("<br>", unsafe_allow_html=True)
         with st.form("register_form"):
-            st.subheader("📝 Create New Trader Account")
-            email = st.text_input("Email")
-            password = st.text_input("Password (min 6 chars)", type="password")
-            submit = st.form_submit_button("Register")
+            st.subheader("📝 Request Access Credentials")
+            email = st.text_input("Primary Email")
+            password = st.text_input("Set Security Token (Min 6 chars)", type="password")
+            submit = st.form_submit_button("Create Terminal Profile")
             
             if submit:
                 if not email or not password:
-                    st.error("Please fill in all details.")
+                    st.error("Please fill in all parameter fields.")
                 else:
                     try:
                         res = supabase.auth.sign_up({"email": email, "password": password})
-                        st.success("Account created successfully! Click 'Sign In' above to log in.")
+                        st.success("Profile created! Authenticate above to continue.")
                     except Exception as e:
                         st.error(f"Registration Failed: {e}")
 
     st.stop()
 
-# --- MAIN TERMINAL (AFTER SUCCESSFUL LOGIN) ---
+# --- MAIN QUANT TERMINAL (AUTHENTICATED SESSION) ---
 user_email = st.session_state.user.email
 
-st.sidebar.markdown(f"👤 **Account:** `{user_email}`")
+# Navbar Header
+st.markdown(f"""
+    <div class="terminal-navbar">
+        <div class="brand-logo">⚡ ALPHASCAN PRO <span style="font-size: 0.8rem; color: #8B949E; font-family: var(--font-mono);">[v2.4 QUANT ENGINE]</span></div>
+        <div class="status-badge"><span class="status-dot"></span> LINKED: {user_email}</div>
+    </div>
+""", unsafe_allow_html=True)
 
-# Fetch current chat id from session
+# Sidebar Configuration
+st.sidebar.markdown("<h3 style='margin-bottom: 0;'>⚙️ Control Panel</h3>", unsafe_allow_html=True)
+st.sidebar.caption("Execution parameters & routing")
+st.sidebar.markdown("---")
+
+# Fetch Chat ID from Session or Metadata
 if not st.session_state.telegram_chat_id and st.session_state.user and st.session_state.user.user_metadata:
     st.session_state.telegram_chat_id = st.session_state.user.user_metadata.get("telegram_chat_id", "")
 
-# Telegram Link Management Section in Sidebar
-with st.sidebar.expander("📲 Telegram Alerts Setup", expanded=True if not st.session_state.telegram_chat_id else False):
-    st.caption("Link your Telegram Chat ID once to receive instant scanner alerts on your Bot.")
-    
+# Telegram Setup Component
+with st.sidebar.expander("📲 Telegram Routing Configuration", expanded=not bool(st.session_state.telegram_chat_id)):
     current_val = st.session_state.telegram_chat_id
-    telegram_id_input = st.text_input("Enter Telegram Chat ID:", value=current_val, key="tg_id")
+    telegram_id_input = st.text_input("Telegram Chat ID:", value=current_val, key="tg_id")
     
-    if st.button("Save Telegram ID"):
+    if st.button("Save Chat ID", use_container_width=True):
         clean_id = telegram_id_input.strip()
         if clean_id:
             try:
-                # Save to Supabase User Metadata
                 res = supabase.auth.update_user({"data": {"telegram_chat_id": clean_id}})
                 if res.user:
                     st.session_state.user = res.user
                 st.session_state.telegram_chat_id = clean_id
-                st.success("✅ Chat ID Saved & Linked!")
+                st.success("✅ Endpoint Saved!")
                 st.rerun()
             except Exception as e:
-                st.error(f"Failed to update: {e}")
+                st.error(f"Save error: {e}")
         else:
-            st.warning("Please enter a valid Chat ID.")
+            st.warning("Provide a valid numeric Chat ID.")
 
-    st.markdown("""
-    <small><b>How to get your Telegram Chat ID?</b><br>
-    1. Telegram par <code>@userinfobot</code> search karo.<br>
-    2. Uspe <b>Start</b> dabao - wo aapko aapka numeric <b>Id</b> batayega.<br>
-    3. Wo numeric ID yahan paste karke <b>Save</b> kar do.<br><br>
-    ⚠️ <i>Important: Apne <b>Scanner Bot</b> par jaakar bhi ek baar <b>/start</b> zaroor dabayein taaki bot aapko alerts bhej sake.</i></small>
-    """, unsafe_allow_html=True)
+    st.caption("Obtain Chat ID from `@userinfobot`. Ensure you trigger `/start` on your dedicated Alert Bot.")
 
-if st.sidebar.button("🚪 Logout", use_container_width=True):
+st.sidebar.markdown("---")
+
+# Scanner Core Parameters
+scan_mode = st.sidebar.radio("Market Universe:", ["Custom Watchlist", "Nifty 50", "Full NSE (2000+ Stocks)"])
+buffer_pct = st.sidebar.slider("10 EMA Buffer Range (%)", 0.5, 3.0, 2.0, 0.1)
+
+symbols_to_scan = []
+if scan_mode == "Custom Watchlist":
+    custom_input = st.sidebar.text_area("Tickers (Comma Separated):", "RELIANCE, TATASTEEL, INFY, ICICIBANK, LT, ZOMATO")
+    symbols_to_scan = [f"{s.strip().upper()}.NS" for s in custom_input.split(",") if s.strip() != ""]
+elif scan_mode == "Nifty 50":
+    symbols_to_scan = ["ADANIENT.NS", "ADANIPORTS.NS", "ASIANPAINT.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "ITC.NS", "LT.NS", "RELIANCE.NS", "SBIN.NS", "TCS.NS", "TITAN.NS"]
+else:
+    def get_all_nse_symbols():
+        url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                with open("EQUITY_L.csv", "wb") as f:
+                    f.write(response.content)
+                df = pd.read_csv("EQUITY_L.csv")
+                df = df[df[" SERIES"] == "EQ"]
+                return [f"{symbol.strip()}.NS" for symbol in df["SYMBOL"]]
+        except Exception:
+            pass
+        return ["RELIANCE.NS", "TATASTEEL.NS", "INFY.NS", "ICICIBANK.NS", "LT.NS"]
+    symbols_to_scan = get_all_nse_symbols()
+
+st.sidebar.markdown("---")
+if st.sidebar.button("🚪 Terminate Session", use_container_width=True):
     try:
         supabase.auth.sign_out()
     except Exception:
@@ -220,24 +390,7 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state.telegram_chat_id = ""
     st.rerun()
 
-st.sidebar.divider()
-
-# --- SCANNER LOGIC ---
-def get_all_nse_symbols():
-    url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            with open("EQUITY_L.csv", "wb") as f:
-                f.write(response.content)
-            df = pd.read_csv("EQUITY_L.csv")
-            df = df[df[" SERIES"] == "EQ"]
-            return [f"{symbol.strip()}.NS" for symbol in df["SYMBOL"]]
-    except Exception:
-        pass
-    return ["RELIANCE.NS", "TATASTEEL.NS", "INFY.NS", "ICICIBANK.NS", "LT.NS"]
-
+# --- SCANNER ALGORITHM ---
 def process_single_stock(symbol, buffer_pct):
     try:
         ticker = yf.Ticker(symbol)
@@ -260,40 +413,22 @@ def process_single_stock(symbol, buffer_pct):
             stock_name = symbol.replace(".NS", "")
             diff_pct = round(((current_close - ema10) / ema10) * 100, 2)
             return {
-                "Stock": stock_name,
-                "Price (₹)": current_close,
+                "Ticker": stock_name,
+                "LTP (₹)": current_close,
                 "Weekly Low (₹)": current_low,
                 "10 EMA (₹)": ema10,
-                "Distance (%)": f"{diff_pct}%",
+                "Spread (%)": f"{diff_pct}%",
             }
     except Exception:
         return None
     return None
 
-# Terminal UI Header
-st.title("⚡ AlphaScan Pro Quantitative Terminal")
-st.caption("Weekly 10 EMA Support Scanner & Multi-threaded Parameter Engine")
-st.divider()
-
-# Configurations
-st.sidebar.header("⚙️ Scanner Settings")
-scan_mode = st.sidebar.radio("Market Universe:", ["Custom Watchlist", "Nifty 50", "Full NSE (2000+ Stocks)"])
-buffer_pct = st.sidebar.slider("10 EMA Tolerance Buffer (%)", 0.5, 3.0, 2.0, 0.1)
-
-symbols_to_scan = []
-if scan_mode == "Custom Watchlist":
-    custom_input = st.sidebar.text_area("Tickers (Comma Separated):", "RELIANCE, TATASTEEL, INFY, ICICIBANK, LT, ZOMATO")
-    symbols_to_scan = [f"{s.strip().upper()}.NS" for s in custom_input.split(",") if s.strip() != ""]
-elif scan_mode == "Nifty 50":
-    symbols_to_scan = ["ADANIENT.NS", "ADANIPORTS.NS", "ASIANPAINT.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "ITC.NS", "LT.NS", "RELIANCE.NS", "SBIN.NS", "TCS.NS", "TITAN.NS"]
-else:
-    symbols_to_scan = get_all_nse_symbols()
-
-if st.sidebar.button("🚀 Run Live Scan", use_container_width=True):
+# Execution Triggers
+if st.sidebar.button("🚀 Run Live Scanner Engine", use_container_width=True):
     if not symbols_to_scan:
-        st.sidebar.error("Please add stocks to scan.")
+        st.sidebar.error("Select market parameters.")
     else:
-        st.info(f"Scanning {len(symbols_to_scan)} stocks concurrently...")
+        st.info(f"Executing parallel scan across {len(symbols_to_scan)} market symbols...")
         progress_bar = st.progress(0)
         results = []
 
@@ -308,41 +443,48 @@ if st.sidebar.button("🚀 Run Live Scan", use_container_width=True):
                 progress_bar.progress(completed / len(symbols_to_scan))
 
         st.session_state.scan_results = pd.DataFrame(results) if results else pd.DataFrame()
-        st.success("Scan Execution Complete!")
+        st.success("Scan Routine Execution Complete.")
 
-# Results Render
-if st.session_state.scan_results is not None and not st.session_state.scan_results.empty:
+# Terminal Results Render
+if st.session_state.scan_results is not None:
     df_res = st.session_state.scan_results
+    
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Matches Found</div><div class="metric-value" style="color:var(--accent-green);">{len(df_res)}</div></div>', unsafe_allow_html=True)
+    with m2:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Selected Strategy</div><div class="metric-value">Weekly EMA</div></div>', unsafe_allow_html=True)
+    with m3:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Tolerance Buffer</div><div class="metric-value">±{buffer_pct}%</div></div>', unsafe_allow_html=True)
 
-    col_m1, col_m2, col_m3 = st.columns(3)
-    col_m1.metric("Setups Identified", len(df_res))
-    col_m2.metric("Scan Strategy", "Weekly 10 EMA Support")
-    col_m3.metric("Tolerance Buffer", f"±{buffer_pct}%")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    st.subheader("🎯 Active Swing Candidates")
-    st.dataframe(df_res, use_container_width=True)
+    if not df_res.empty:
+        st.subheader("🎯 Identified Setup Candidates")
+        st.dataframe(df_res, use_container_width=True)
 
-    # Active Linked Chat ID Verification
-    active_chat_id = st.session_state.telegram_chat_id
+        active_chat_id = st.session_state.telegram_chat_id
 
-    if st.button("📲 Push Alerts to My Telegram Bot"):
-        if not active_chat_id:
-            st.error("❌ Telegram Chat ID missing! Please enter and Save your Chat ID in the sidebar settings first.")
-        else:
-            matches_text = [
-                f"• *{row['Stock']}*: Price Rs.{row['Price (₹)']} | 10 EMA Rs.{row['10 EMA (₹)']} ({row['Distance (%)']})"
-                for _, row in df_res.iterrows()
-            ]
-
-            total_sent = 0
-            for i in range(0, len(matches_text), 15):
-                chunk = matches_text[i : i + 15]
-                msg = f"⚡ *ALPHASCAN PRO ALERTS*\n\n" + "\n".join(chunk)
-                if send_telegram_alert(msg, active_chat_id):
-                    total_sent += 1
-                time.sleep(0.4)
-
-            if total_sent > 0:
-                st.success("✅ Setups dispatched successfully to your Bot!")
+        if st.button("📲 Push Signals to Telegram Bot"):
+            if not active_chat_id:
+                st.error("Telegram Chat ID unconfigured. Save your Chat ID in the Control Panel first.")
             else:
-                st.error("❌ Alert delivery failed! Make sure you opened your scanner bot in Telegram and clicked /start at least once.")
+                matches_text = [
+                    f"• *{row['Ticker']}*: LTP Rs.{row['LTP (₹)']} | 10 EMA Rs.{row['10 EMA (₹)']} ({row['Spread (%)']})"
+                    for _, row in df_res.iterrows()
+                ]
+
+                total_sent = 0
+                for i in range(0, len(matches_text), 15):
+                    chunk = matches_text[i : i + 15]
+                    msg = f"⚡ *ALPHASCAN QUANT SIGNALS*\n\n" + "\n".join(chunk)
+                    if send_telegram_alert(msg, active_chat_id):
+                        total_sent += 1
+                    time.sleep(0.4)
+
+                if total_sent > 0:
+                    st.success(" Signals dispatched successfully to your linked bot endpoint.")
+                else:
+                    st.error("Delivery failed. Ensure your bot has received a `/start` command.")
+    else:
+        st.warning("No tickers met the technical criteria during this scan run.")
