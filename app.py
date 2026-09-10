@@ -1,4 +1,5 @@
 import concurrent.futures
+import json
 import time
 import pandas as pd
 import requests
@@ -463,18 +464,119 @@ with tab2:
         
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 3: UNRESTRICTED TRADINGVIEW CHART ENGINE ---
+# --- TAB 3: OFFICIAL TRADINGVIEW LIGHTWEIGHT CANVAS ENGINE ---
 with tab3:
     st.markdown("<br>", unsafe_allow_html=True)
     col_input, _ = st.columns([1, 2])
     with col_input:
-        chart_symbol = st.text_input("Enter Ticker Symbol:", value="ADANIPOWER").upper().strip()
+        chart_symbol = st.text_input("Enter Ticker Symbol (e.g. ADANIPOWER, RELIANCE, INFY):", value="ADANIPOWER").upper().strip()
     
     clean_ticker = chart_symbol.replace(".NS", "").replace("NSE:", "").replace("BSE:", "")
+    yf_symbol = f"{clean_ticker}.NS"
     
-    st.markdown(f"### 📈 TradingView Chart: `{clean_ticker}`")
+    st.markdown(f"### 📈 TradingView Engine: `{clean_ticker}` (Weekly Candles + 10 EMA)")
     
-    # Direct iframe embed bypasses domain restriction checks for Indian stocks
-    tv_iframe_url = f"https://s.tradingview.com/widgetembed/?frameElementId=tradingview_1&symbol=NSE%3A{clean_ticker}&interval=W&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=0D1527&studies=EMA%40tv-basicstudies&theme=dark&style=1&timezone=Asia%2FKolkata"
-    
-    components.iframe(tv_iframe_url, height=650, scrolling=True)
+    try:
+        stock_df = yf.Ticker(yf_symbol).history(period="2y", interval="1wk")
+        if not stock_df.empty and len(stock_df) > 10:
+            stock_df["EMA10"] = ta.trend.ema_indicator(close=stock_df["Close"], window=10)
+            
+            # Format candles for TradingView Lightweight Charts
+            candle_data = []
+            ema_data = []
+            for date, row in stock_df.iterrows():
+                time_str = date.strftime("%Y-%m-%d")
+                candle_data.append({
+                    "time": time_str,
+                    "open": round(float(row["Open"]), 2),
+                    "high": round(float(row["High"]), 2),
+                    "low": round(float(row["Low"]), 2),
+                    "close": round(float(row["Close"]), 2)
+                })
+                if pd.notna(row["EMA10"]):
+                    ema_data.append({
+                        "time": time_str,
+                        "value": round(float(row["EMA10"]), 2)
+                    })
+            
+            candle_json = json.dumps(candle_data)
+            ema_json = json.dumps(ema_data)
+            
+            tv_lightweight_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+                <style>
+                    body {{ margin: 0; padding: 0; background-color: #080A0F; overflow: hidden; }}
+                    #chart-container {{ width: 100%; height: 580px; position: relative; }}
+                    .legend {{
+                        position: absolute; top: 12px; left: 16px; z-index: 10;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        color: #9CA3AF; font-size: 13px; font-weight: 500;
+                        background: rgba(15, 20, 31, 0.75); padding: 6px 12px;
+                        border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);
+                    }}
+                </style>
+            </head>
+            <body>
+                <div id="chart-container">
+                    <div class="legend">
+                        <span style="color: #FFFFFF; font-weight: 700;">{clean_ticker}</span> 
+                        • 1W Candles 
+                        • <span style="color: #00E5FF;">10 EMA</span>
+                    </div>
+                </div>
+                <script>
+                    const container = document.getElementById('chart-container');
+                    const chart = LightweightCharts.createChart(container, {{
+                        width: container.clientWidth,
+                        height: 580,
+                        layout: {{
+                            background: {{ type: 'solid', color: '#080A0F' }},
+                            textColor: '#8B949E',
+                        }},
+                        grid: {{
+                            vertLines: {{ color: 'rgba(255, 255, 255, 0.04)' }},
+                            horzLines: {{ color: 'rgba(255, 255, 255, 0.04)' }},
+                        }},
+                        crosshair: {{
+                            mode: LightweightCharts.CrosshairMode.Normal,
+                        }},
+                        rightPriceScale: {{
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                        }},
+                        timeScale: {{
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            timeVisible: true,
+                        }},
+                    }});
+
+                    const candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {{
+                        upColor: '#10B981',
+                        downColor: '#EF4444',
+                        borderVisible: false,
+                        wickUpColor: '#10B981',
+                        wickDownColor: '#EF4444',
+                    }});
+                    candleSeries.setData({candle_json});
+
+                    const emaSeries = chart.addSeries(LightweightCharts.LineSeries, {{
+                        color: '#00E5FF',
+                        lineWidth: 2,
+                        crosshairMarkerVisible: true,
+                    }});
+                    emaSeries.setData({ema_json});
+
+                    window.addEventListener('resize', () => {{
+                        chart.applyOptions({{ width: container.clientWidth }});
+                    }});
+                </script>
+            </body>
+            </html>
+            """
+            components.html(tv_lightweight_html, height=600)
+        else:
+            st.error(f"No market data found for `{clean_ticker}`.")
+    except Exception as e:
+        st.error(f"Chart Render Error: {e}")
