@@ -1,9 +1,9 @@
 import concurrent.futures
 import time
 import pandas as pd
+import plotly.graph_objects as go
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 import ta
 import yfinance as yf
 from supabase import create_client, Client
@@ -141,7 +141,7 @@ st.markdown("""
         color: var(--text-main);
     }
 
-    /* Streamlit Button Tweaks for Classy Look */
+    /* Streamlit Button Tweaks */
     .stButton > button {
         background: linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%) !important;
         border: 1px solid var(--border-glass-hover) !important;
@@ -307,7 +307,7 @@ with tab1:
 
         symbols_to_scan = []
         if scan_mode == "Custom Watchlist":
-            custom_input = st.text_area("Watchlist Tickers", "RELIANCE, TATASTEEL, INFY, ICICIBANK, LT, ZOMATO")
+            custom_input = st.text_area("Watchlist Tickers", "RELIANCE, TATASTEEL, INFY, ICICIBANK, LT, ZOMATO, ADANIPOWER")
             symbols_to_scan = [f"{s.strip().upper()}.NS" for s in custom_input.split(",") if s.strip() != ""]
         elif scan_mode == "Nifty 50":
             symbols_to_scan = ["ADANIENT.NS", "ADANIPORTS.NS", "ASIANPAINT.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "ITC.NS", "LT.NS", "RELIANCE.NS", "SBIN.NS", "TCS.NS", "TITAN.NS"]
@@ -463,36 +463,56 @@ with tab2:
         
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 3: TRADINGVIEW INTERACTIVE CHART ENGINE ---
+# --- TAB 3: REAL-TIME INTERACTIVE CHART ENGINE ---
 with tab3:
     st.markdown("<br>", unsafe_allow_html=True)
-    chart_symbol = st.text_input("Enter NSE Ticker Symbol for Real-time Chart:", value="RELIANCE").upper().strip()
     
-    st.markdown(f"### 📈 Realtime Market Chart: `{chart_symbol}`")
+    col_input, _ = st.columns([1, 2])
+    with col_input:
+        chart_symbol = st.text_input("Enter NSE Ticker Symbol:", value="ADANIPOWER").upper().strip()
     
-    # TradingView Widget Embed Component
-    tv_widget_html = f"""
-    <div class="tradingview-widget-container" style="height:600px;width:100%;">
-      <div id="tradingview_chart" style="height:calc(100% - 32px);width:100%;"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-      <script type="text/javascript">
-      new TradingView.widget(
-      {{
-      "autosize": true,
-      "symbol": "NSE:{chart_symbol}",
-      "interval": "W",
-      "timezone": "Asia/Kolkata",
-      "theme": "dark",
-      "style": "1",
-      "locale": "en",
-      "toolbar_bg": "#f1f3f6",
-      "enable_publishing": false,
-      "hide_legend": false,
-      "save_image": false,
-      "container_id": "tradingview_chart"
-    }}
-      );
-      </script>
-    </div>
-    """
-    components.html(tv_widget_html, height=620)
+    clean_ticker = chart_symbol.replace(".NS", "")
+    yf_symbol = f"{clean_ticker}.NS"
+    
+    st.markdown(f"### 📈 Interactive Candlestick Chart: `{clean_ticker}`")
+    
+    try:
+        stock_data = yf.Ticker(yf_symbol).history(period="1y", interval="1wk")
+        
+        if not stock_data.empty:
+            stock_data["EMA10"] = ta.trend.ema_indicator(close=stock_data["Close"], window=10)
+            
+            fig = go.Figure()
+            
+            fig.add_trace(go.Candlestick(
+                x=stock_data.index,
+                open=stock_data['Open'],
+                high=stock_data['High'],
+                low=stock_data['Low'],
+                close=stock_data['Close'],
+                name='Price'
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=stock_data.index,
+                y=stock_data['EMA10'],
+                mode='lines',
+                name='10 EMA',
+                line=dict(color='#00E5FF', width=2)
+            ))
+            
+            fig.update_layout(
+                template='plotly_dark',
+                paper_bgcolor='rgba(15, 20, 31, 0.6)',
+                plot_bgcolor='rgba(5, 7, 10, 0.8)',
+                height=600,
+                margin=dict(l=20, r=20, t=30, b=20),
+                xaxis_rangeslider_visible=False,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.error(f"Unable to fetch data for `{clean_ticker}`. Check if the ticker symbol is correct.")
+    except Exception as e:
+        st.error(f"Error loading chart: {e}")
