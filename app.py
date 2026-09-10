@@ -33,13 +33,11 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Global Dark Theme */
     .stApp {
         background-color: #0b0e14;
         color: #e6edf3;
     }
     
-    /* Hero Card styling */
     .hero-card {
         background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
         border: 1px solid #30363d;
@@ -57,7 +55,6 @@ st.markdown("""
         text-align: center;
     }
 
-    /* Primary Accent Buttons */
     .stButton>button {
         background-color: #238636;
         color: #ffffff;
@@ -72,7 +69,6 @@ st.markdown("""
         border-color: #8b949e;
     }
     
-    /* Secondary Action Buttons */
     div[data-testid="stForm"] {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -86,9 +82,11 @@ st.markdown("""
 if "user" not in st.session_state:
     st.session_state.user = None
 if "auth_mode" not in st.session_state:
-    st.session_state.auth_mode = None  # None, "login", or "register"
+    st.session_state.auth_mode = None
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = None
+if "telegram_chat_id" not in st.session_state:
+    st.session_state.telegram_chat_id = ""
 
 # --- TELEGRAM UTILS ---
 def send_telegram_alert(message, chat_id):
@@ -102,7 +100,6 @@ def send_telegram_alert(message, chat_id):
 
 # --- LANDING PAGE (UNAUTHENTICATED) ---
 if not st.session_state.user:
-    # Top Hero Section
     st.markdown("""
     <div class="hero-card">
         <h1 style="color: #58a6ff; font-size: 2.8rem; margin-bottom: 5px;">⚡ AlphaScan Pro</h1>
@@ -110,7 +107,6 @@ if not st.session_state.user:
     </div>
     """, unsafe_allow_html=True)
 
-    # Feature Metrics Display
     col_f1, col_f2, col_f3, col_f4 = st.columns(4)
     with col_f1:
         st.markdown("""<div class="feature-card"><h3>📈 2000+</h3><p style="color:#8b949e">NSE Stocks Scanned Realtime</p></div>""", unsafe_allow_html=True)
@@ -123,7 +119,6 @@ if not st.session_state.user:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Action Buttons to toggle Login/Register forms
     col_btn1, col_btn2, _ = st.columns([1, 1, 2])
     with col_btn1:
         if st.button("🔑 Sign In to Terminal", use_container_width=True):
@@ -132,7 +127,6 @@ if not st.session_state.user:
         if st.button("📝 Register Account", use_container_width=True):
             st.session_state.auth_mode = "register"
 
-    # Display Dynamic Auth Form Modal
     if st.session_state.auth_mode == "login":
         st.markdown("---")
         with st.form("login_form"):
@@ -148,6 +142,9 @@ if not st.session_state.user:
                     try:
                         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
                         st.session_state.user = res.user
+                        # Load existing metadata Chat ID if present
+                        if res.user and res.user.user_metadata:
+                            st.session_state.telegram_chat_id = res.user.user_metadata.get("telegram_chat_id", "")
                         st.success("Access Granted! Loading Terminal...")
                         st.rerun()
                     except Exception as e:
@@ -171,34 +168,46 @@ if not st.session_state.user:
                     except Exception as e:
                         st.error(f"Registration Failed: {e}")
 
-    st.stop()  # Stop until user authenticates
+    st.stop()
 
 # --- MAIN TERMINAL (AFTER SUCCESSFUL LOGIN) ---
-user_id = st.session_state.user.id
 user_email = st.session_state.user.email
 
 st.sidebar.markdown(f"👤 **Account:** `{user_email}`")
 
+# Fetch current chat id from session
+if not st.session_state.telegram_chat_id and st.session_state.user and st.session_state.user.user_metadata:
+    st.session_state.telegram_chat_id = st.session_state.user.user_metadata.get("telegram_chat_id", "")
+
 # Telegram Link Management Section in Sidebar
-with st.sidebar.expander("📲 Telegram Alerts Setup"):
-    st.caption("Link your Telegram Chat ID once to receive instant stock scanner alerts.")
-    telegram_id_input = st.text_input("Enter Telegram Chat ID:", key="tg_id")
+with st.sidebar.expander("📲 Telegram Alerts Setup", expanded=True if not st.session_state.telegram_chat_id else False):
+    st.caption("Link your Telegram Chat ID once to receive instant scanner alerts on your Bot.")
+    
+    current_val = st.session_state.telegram_chat_id
+    telegram_id_input = st.text_input("Enter Telegram Chat ID:", value=current_val, key="tg_id")
+    
     if st.button("Save Telegram ID"):
-        if telegram_id_input.strip():
+        clean_id = telegram_id_input.strip()
+        if clean_id:
             try:
-                # Save chat ID to user metadata in Supabase
-                supabase.auth.update_user({"data": {"telegram_chat_id": telegram_id_input.strip()}})
-                st.success("Telegram ID Linked Successfully!")
+                # Save to Supabase User Metadata
+                res = supabase.auth.update_user({"data": {"telegram_chat_id": clean_id}})
+                if res.user:
+                    st.session_state.user = res.user
+                st.session_state.telegram_chat_id = clean_id
+                st.success("✅ Chat ID Saved & Linked!")
+                st.rerun()
             except Exception as e:
                 st.error(f"Failed to update: {e}")
         else:
             st.warning("Please enter a valid Chat ID.")
 
     st.markdown("""
-    <small><b>How to get Chat ID?</b><br>
-    1. Search <code>@userinfobot</code> on Telegram.<br>
-    2. Click Start - it will give you your numeric <b>Id</b>.<br>
-    3. Paste that ID here & click Save.</small>
+    <small><b>How to get your Telegram Chat ID?</b><br>
+    1. Telegram par <code>@userinfobot</code> search karo.<br>
+    2. Uspe <b>Start</b> dabao - wo aapko aapka numeric <b>Id</b> batayega.<br>
+    3. Wo numeric ID yahan paste karke <b>Save</b> kar do.<br><br>
+    ⚠️ <i>Important: Apne <b>Scanner Bot</b> par jaakar bhi ek baar <b>/start</b> zaroor dabayein taaki bot aapko alerts bhej sake.</i></small>
     """, unsafe_allow_html=True)
 
 if st.sidebar.button("🚪 Logout", use_container_width=True):
@@ -208,6 +217,7 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
         pass
     st.session_state.user = None
     st.session_state.auth_mode = None
+    st.session_state.telegram_chat_id = ""
     st.rerun()
 
 st.sidebar.divider()
@@ -312,12 +322,12 @@ if st.session_state.scan_results is not None and not st.session_state.scan_resul
     st.subheader("🎯 Active Swing Candidates")
     st.dataframe(df_res, use_container_width=True)
 
-    # Telegram Alert Button using account linked chat_id
-    saved_chat_id = st.session_state.user.user_metadata.get("telegram_chat_id", "") if st.session_state.user.user_metadata else ""
+    # Active Linked Chat ID Verification
+    active_chat_id = st.session_state.telegram_chat_id
 
-    if st.button("📲 Push Alerts to My Telegram"):
-        if not saved_chat_id:
-            st.error("Telegram Chat ID not linked! Please link your ID from the sidebar settings first.")
+    if st.button("📲 Push Alerts to My Telegram Bot"):
+        if not active_chat_id:
+            st.error("❌ Telegram Chat ID missing! Please enter and Save your Chat ID in the sidebar settings first.")
         else:
             matches_text = [
                 f"• *{row['Stock']}*: Price Rs.{row['Price (₹)']} | 10 EMA Rs.{row['10 EMA (₹)']} ({row['Distance (%)']})"
@@ -328,11 +338,11 @@ if st.session_state.scan_results is not None and not st.session_state.scan_resul
             for i in range(0, len(matches_text), 15):
                 chunk = matches_text[i : i + 15]
                 msg = f"⚡ *ALPHASCAN PRO ALERTS*\n\n" + "\n".join(chunk)
-                if send_telegram_alert(msg, saved_chat_id):
+                if send_telegram_alert(msg, active_chat_id):
                     total_sent += 1
                 time.sleep(0.4)
 
             if total_sent > 0:
-                st.success("✅ Setups dispatched to your linked Telegram account!")
+                st.success("✅ Setups dispatched successfully to your Bot!")
             else:
-                st.error("❌ Failed to send alert. Check if Chat ID is correct.")
+                st.error("❌ Alert delivery failed! Make sure you opened your scanner bot in Telegram and clicked /start at least once.")
