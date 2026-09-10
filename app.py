@@ -463,37 +463,18 @@ with tab2:
         
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 3: TRADINGVIEW OFFICIAL CHART WIDGET ---
+# --- TAB 3: UNRESTRICTED TRADINGVIEW CHART ENGINE ---
 with tab3:
     st.markdown("<br>", unsafe_allow_html=True)
     col_input, _ = st.columns([1, 2])
     with col_input:
-        chart_symbol = st.text_input("Enter Ticker Symbol (e.g. ADANIPOWER, RELIANCE, INFY):", value="ADANIPOWER").upper().strip()
+        chart_symbol = st.text_input("Enter Ticker Symbol:", value="ADANIPOWER").upper().strip()
     
     clean_ticker = chart_symbol.replace(".NS", "").replace("NSE:", "").replace("BSE:", "")
     
     st.markdown(f"### 📈 TradingView Chart: `{clean_ticker}`")
     
-    # Fully functional embedded TradingView Widget script
-    tv_widget_code = f"""
-    <div class="tradingview-widget-container" style="height:650px;width:100%;">
-      <div id="tradingview_advanced_chart" style="height:calc(100% - 32px);width:100%;"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-      <script type="text/javascript">
-      new TradingView.widget({{
-        "autosize": true,
-        "symbol": "NSE:{clean_ticker}",
-        "interval": "W",
-        "timezone": "Asia/Kolkata",
-        "theme": "dark",
-        "style": "1",
-        "locale": "en",
-        "toolbar_bg": "#0D1527",
-        "enable_publishing": false,
-        "allow_symbol_change": true,
-        "container_id": "tradingview_advanced_chart"
-      }});
-      </script>
-    </div>
-    """
-    components.html(tv_widget_code, height=670)
+    # Direct iframe embed bypasses domain restriction checks for Indian stocks
+    tv_iframe_url = f"https://s.tradingview.com/widgetembed/?frameElementId=tradingview_1&symbol=NSE%3A{clean_ticker}&interval=W&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=0D1527&studies=EMA%40tv-basicstudies&theme=dark&style=1&timezone=Asia%2FKolkata"
+    
+    components.iframe(tv_iframe_url, height=650, scrolling=True)
