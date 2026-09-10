@@ -1,10 +1,10 @@
 import concurrent.futures
-import json
 import time
 import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 import ta
 import yfinance as yf
 from supabase import create_client, Client
@@ -171,16 +171,11 @@ st.markdown("""
         backdrop-filter: blur(16px);
     }
 
-    .stTextInput>div>div>input {
+    .stTextInput>div>div>input, div[data-baseweb="select"] > div {
         background: rgba(255, 255, 255, 0.03) !important;
         border: 1px solid var(--border-glass) !important;
         color: var(--text-main) !important;
         border-radius: 8px !important;
-    }
-
-    .stTextInput>div>div>input:focus {
-        border-color: var(--accent-glow) !important;
-        box-shadow: 0 0 10px rgba(0, 229, 255, 0.2) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -204,6 +199,42 @@ def send_telegram_alert(message, chat_id):
         return res.status_code == 200
     except Exception:
         return False
+
+# --- NSE TICKER & COMPANY MAPPING ENGINE ---
+@st.cache_data(ttl=86400)
+def load_nse_universe():
+    url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            import io
+            df = pd.read_csv(io.StringIO(resp.content.decode("utf-8")))
+            df = df[df[" SERIES"] == "EQ"]
+            records = {}
+            for _, row in df.iterrows():
+                symbol = str(row["SYMBOL"]).strip()
+                name = str(row["NAME OF COMPANY"]).strip()
+                label = f"{symbol} — {name}"
+                records[label] = f"{symbol}.NS"
+            return records
+    except Exception:
+        pass
+    fallback = {
+        "ADANIPOWER — Adani Power Limited": "ADANIPOWER.NS",
+        "RELIANCE — Reliance Industries Limited": "RELIANCE.NS",
+        "TATASTEEL — Tata Steel Limited": "TATASTEEL.NS",
+        "INFY — Infosys Limited": "INFY.NS",
+        "ICICIBANK — ICICI Bank Limited": "ICICIBANK.NS",
+        "SBIN — State Bank of India": "SBIN.NS",
+        "HDFCBANK — HDFC Bank Limited": "HDFCBANK.NS",
+        "TCS — Tata Consultancy Services Limited": "TCS.NS",
+        "LT — Larsen & Toubro Limited": "LT.NS",
+        "ZOMATO — Zomato Limited": "ZOMATO.NS"
+    }
+    return fallback
+
+nse_universe_dict = load_nse_universe()
 
 # --- LANDING PAGE (AUTHENTICATION) ---
 if not st.session_state.user:
@@ -292,8 +323,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# Main Navigation Tabs
-tab1, tab2, tab3 = st.tabs(["📊 Terminal & Scanner", "📲 Routing & Settings", "📈 TradingView Chart Engine"])
+tab1, tab2, tab3 = st.tabs(["📊 Terminal & Scanner", "📲 Routing & Settings", "📈 Interactive Technical Chart"])
 
 # --- TAB 1: TERMINAL SCANNER ---
 with tab1:
@@ -313,21 +343,7 @@ with tab1:
         elif scan_mode == "Nifty 50":
             symbols_to_scan = ["ADANIENT.NS", "ADANIPORTS.NS", "ASIANPAINT.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "ITC.NS", "LT.NS", "RELIANCE.NS", "SBIN.NS", "TCS.NS", "TITAN.NS"]
         else:
-            def get_all_nse_symbols():
-                url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
-                headers = {"User-Agent": "Mozilla/5.0"}
-                try:
-                    response = requests.get(url, headers=headers)
-                    if response.status_code == 200:
-                        with open("EQUITY_L.csv", "wb") as f:
-                            f.write(response.content)
-                        df = pd.read_csv("EQUITY_L.csv")
-                        df = df[df[" SERIES"] == "EQ"]
-                        return [f"{symbol.strip()}.NS" for symbol in df["SYMBOL"]]
-                except Exception:
-                    pass
-                return ["RELIANCE.NS", "TATASTEEL.NS", "INFY.NS", "ICICIBANK.NS", "LT.NS"]
-            symbols_to_scan = get_all_nse_symbols()
+            symbols_to_scan = list(nse_universe_dict.values())
 
         st.markdown("<br>", unsafe_allow_html=True)
         run_scan = st.button("🚀 Run Live Scanner", use_container_width=True)
@@ -464,119 +480,131 @@ with tab2:
         
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 3: OFFICIAL TRADINGVIEW LIGHTWEIGHT CANVAS ENGINE ---
+# --- TAB 3: INTERACTIVE TECHNICAL CHART ENGINE (AUTO-SUGGEST + DRAWINGS + INDICATORS) ---
 with tab3:
     st.markdown("<br>", unsafe_allow_html=True)
-    col_input, _ = st.columns([1, 2])
-    with col_input:
-        chart_symbol = st.text_input("Enter Ticker Symbol (e.g. ADANIPOWER, RELIANCE, INFY):", value="ADANIPOWER").upper().strip()
-    
-    clean_ticker = chart_symbol.replace(".NS", "").replace("NSE:", "").replace("BSE:", "")
-    yf_symbol = f"{clean_ticker}.NS"
-    
-    st.markdown(f"### 📈 TradingView Engine: `{clean_ticker}` (Weekly Candles + 10 EMA)")
-    
+
+    c_search, c_tf, c_ind = st.columns([2, 1, 2])
+
+    with c_search:
+        options_list = list(nse_universe_dict.keys())
+        default_index = 0
+        for i, opt in enumerate(options_list):
+            if opt.startswith("ADANIPOWER"):
+                default_index = i
+                break
+
+        selected_label = st.selectbox(
+            "🔍 Search Stock by Name or Symbol (Auto-Suggest):",
+            options=options_list,
+            index=default_index,
+            help="Type company name (e.g. Tata, Adani, Reliance) or ticker"
+        )
+        selected_yf_symbol = nse_universe_dict[selected_label]
+        clean_stock_ticker = selected_yf_symbol.replace(".NS", "")
+
+    with c_tf:
+        timeframe = st.selectbox("Timeframe", ["1W (Weekly)", "1D (Daily)", "1M (Monthly)"], index=0)
+        interval_map = {"1W (Weekly)": "1wk", "1D (Daily)": "1d", "1M (Monthly)": "1mo"}
+        period_map = {"1W (Weekly)": "2y", "1D (Daily)": "1y", "1M (Monthly)": "5y"}
+
+    with c_ind:
+        selected_indicators = st.multiselect(
+            "📈 Overlay Indicators:",
+            ["10 EMA", "20 EMA", "50 EMA", "200 EMA", "Volume"],
+            default=["10 EMA", "Volume"]
+        )
+
     try:
-        stock_df = yf.Ticker(yf_symbol).history(period="2y", interval="1wk")
-        if not stock_df.empty and len(stock_df) > 10:
-            stock_df["EMA10"] = ta.trend.ema_indicator(close=stock_df["Close"], window=10)
-            
-            # Format candles for TradingView Lightweight Charts
-            candle_data = []
-            ema_data = []
-            for date, row in stock_df.iterrows():
-                time_str = date.strftime("%Y-%m-%d")
-                candle_data.append({
-                    "time": time_str,
-                    "open": round(float(row["Open"]), 2),
-                    "high": round(float(row["High"]), 2),
-                    "low": round(float(row["Low"]), 2),
-                    "close": round(float(row["Close"]), 2)
-                })
-                if pd.notna(row["EMA10"]):
-                    ema_data.append({
-                        "time": time_str,
-                        "value": round(float(row["EMA10"]), 2)
-                    })
-            
-            candle_json = json.dumps(candle_data)
-            ema_json = json.dumps(ema_data)
-            
-            tv_lightweight_html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-                <style>
-                    body {{ margin: 0; padding: 0; background-color: #080A0F; overflow: hidden; }}
-                    #chart-container {{ width: 100%; height: 580px; position: relative; }}
-                    .legend {{
-                        position: absolute; top: 12px; left: 16px; z-index: 10;
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                        color: #9CA3AF; font-size: 13px; font-weight: 500;
-                        background: rgba(15, 20, 31, 0.75); padding: 6px 12px;
-                        border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);
-                    }}
-                </style>
-            </head>
-            <body>
-                <div id="chart-container">
-                    <div class="legend">
-                        <span style="color: #FFFFFF; font-weight: 700;">{clean_ticker}</span> 
-                        • 1W Candles 
-                        • <span style="color: #00E5FF;">10 EMA</span>
-                    </div>
-                </div>
-                <script>
-                    const container = document.getElementById('chart-container');
-                    const chart = LightweightCharts.createChart(container, {{
-                        width: container.clientWidth,
-                        height: 580,
-                        layout: {{
-                            background: {{ type: 'solid', color: '#080A0F' }},
-                            textColor: '#8B949E',
-                        }},
-                        grid: {{
-                            vertLines: {{ color: 'rgba(255, 255, 255, 0.04)' }},
-                            horzLines: {{ color: 'rgba(255, 255, 255, 0.04)' }},
-                        }},
-                        crosshair: {{
-                            mode: LightweightCharts.CrosshairMode.Normal,
-                        }},
-                        rightPriceScale: {{
-                            borderColor: 'rgba(255, 255, 255, 0.1)',
-                        }},
-                        timeScale: {{
-                            borderColor: 'rgba(255, 255, 255, 0.1)',
-                            timeVisible: true,
-                        }},
-                    }});
+        data = yf.Ticker(selected_yf_symbol).history(
+            period=period_map[timeframe],
+            interval=interval_map[timeframe]
+        )
 
-                    const candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {{
-                        upColor: '#10B981',
-                        downColor: '#EF4444',
-                        borderVisible: false,
-                        wickUpColor: '#10B981',
-                        wickDownColor: '#EF4444',
-                    }});
-                    candleSeries.setData({candle_json});
+        if not data.empty and len(data) >= 5:
+            # Indicator Calculations
+            if "10 EMA" in selected_indicators:
+                data["EMA10"] = ta.trend.ema_indicator(data["Close"], window=10)
+            if "20 EMA" in selected_indicators:
+                data["EMA20"] = ta.trend.ema_indicator(data["Close"], window=20)
+            if "50 EMA" in selected_indicators:
+                data["EMA50"] = ta.trend.ema_indicator(data["Close"], window=50)
+            if "200 EMA" in selected_indicators and len(data) > 200:
+                data["EMA200"] = ta.trend.ema_indicator(data["Close"], window=200)
 
-                    const emaSeries = chart.addSeries(LightweightCharts.LineSeries, {{
-                        color: '#00E5FF',
-                        lineWidth: 2,
-                        crosshairMarkerVisible: true,
-                    }});
-                    emaSeries.setData({ema_json});
+            # Subplots for Price and Volume
+            has_vol = "Volume" in selected_indicators and "Volume" in data.columns
+            fig = make_subplots(
+                rows=2 if has_vol else 1,
+                cols=1,
+                shared_xaxes=True,
+                vertical_spacing=0.03,
+                row_heights=[0.8, 0.2] if has_vol else [1.0]
+            )
 
-                    window.addEventListener('resize', () => {{
-                        chart.applyOptions({{ width: container.clientWidth }});
-                    }});
-                </script>
-            </body>
-            </html>
-            """
-            components.html(tv_lightweight_html, height=600)
+            # Interactive Candlesticks
+            fig.add_trace(go.Candlestick(
+                x=data.index,
+                open=data["Open"],
+                high=data["High"],
+                low=data["Low"],
+                close=data["Close"],
+                name="Price",
+                increasing_line_color="#10B981",
+                decreasing_line_color="#EF4444"
+            ), row=1, col=1)
+
+            # EMA Lines Overlay
+            if "10 EMA" in selected_indicators and "EMA10" in data:
+                fig.add_trace(go.Scatter(x=data.index, y=data["EMA10"], line=dict(color="#00E5FF", width=1.5), name="10 EMA"), row=1, col=1)
+            if "20 EMA" in selected_indicators and "EMA20" in data:
+                fig.add_trace(go.Scatter(x=data.index, y=data["EMA20"], line=dict(color="#F59E0B", width=1.5), name="20 EMA"), row=1, col=1)
+            if "50 EMA" in selected_indicators and "EMA50" in data:
+                fig.add_trace(go.Scatter(x=data.index, y=data["EMA50"], line=dict(color="#EC4899", width=1.5), name="50 EMA"), row=1, col=1)
+            if "200 EMA" in selected_indicators and "EMA200" in data:
+                fig.add_trace(go.Scatter(x=data.index, y=data["EMA200"], line=dict(color="#8B5CF6", width=2), name="200 EMA"), row=1, col=1)
+
+            # Volume Bar Subplot
+            if has_vol:
+                colors = ["#10B981" if c >= o else "#EF4444" for c, o in zip(data["Close"], data["Open"])]
+                fig.add_trace(go.Bar(
+                    x=data.index,
+                    y=data["Volume"],
+                    marker_color=colors,
+                    name="Volume",
+                    opacity=0.5
+                ), row=2, col=1)
+
+            # High-end Dark Layout & Drawing Toolbar Enablement
+            fig.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(15, 20, 31, 0.7)",
+                plot_bgcolor="rgba(5, 7, 10, 0.9)",
+                height=650,
+                margin=dict(l=10, r=10, t=30, b=10),
+                xaxis_rangeslider_visible=False,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                dragmode="drawline"  # Default interaction: Draw Trendline
+            )
+
+            # Config with Full Drawing Tools (Lines, Rectangles, Circles, Shapes, Text)
+            config = {
+                "scrollZoom": True,
+                "displayModeBar": True,
+                "modeBarButtonsToAdd": [
+                    "drawline",
+                    "drawopenpath",
+                    "drawclosedpath",
+                    "drawcircle",
+                    "drawrect",
+                    "eraseshape"
+                ],
+                "toImageButtonOptions": {"format": "png", "filename": f"{clean_stock_ticker}_chart"}
+            }
+
+            st.plotly_chart(fig, use_container_width=True, config=config)
+            st.caption("🛠️ **Drawing Tools Active:** Use the top-right toolbar to draw trendlines, support/resistance boxes, or erase shapes.")
         else:
-            st.error(f"No market data found for `{clean_ticker}`.")
+            st.error(f"No price history returned for `{clean_stock_ticker}`.")
     except Exception as e:
-        st.error(f"Chart Render Error: {e}")
+        st.error(f"Failed to fetch real-time chart: {e}")
