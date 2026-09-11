@@ -1,10 +1,10 @@
 import concurrent.futures
+import json
 import time
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 import ta
 import yfinance as yf
 from supabase import create_client, Client
@@ -200,9 +200,9 @@ def send_telegram_alert(message, chat_id):
     except Exception:
         return False
 
-# --- NSE TICKER & COMPANY MAPPING ENGINE ---
+# --- NSE & BSE MAPPING ENGINE (AUTO-SUGGESTION SYSTEM) ---
 @st.cache_data(ttl=86400)
-def load_nse_universe():
+def load_stock_universe():
     url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
@@ -213,28 +213,26 @@ def load_nse_universe():
             df = df[df[" SERIES"] == "EQ"]
             records = {}
             for _, row in df.iterrows():
-                symbol = str(row["SYMBOL"]).strip()
-                name = str(row["NAME OF COMPANY"]).strip()
-                label = f"{symbol} — {name}"
-                records[label] = f"{symbol}.NS"
+                sym = str(row["SYMBOL"]).strip()
+                company = str(row["NAME OF COMPANY"]).strip()
+                records[f"{sym} — {company}"] = sym
             return records
     except Exception:
         pass
-    fallback = {
-        "ADANIPOWER — Adani Power Limited": "ADANIPOWER.NS",
-        "RELIANCE — Reliance Industries Limited": "RELIANCE.NS",
-        "TATASTEEL — Tata Steel Limited": "TATASTEEL.NS",
-        "INFY — Infosys Limited": "INFY.NS",
-        "ICICIBANK — ICICI Bank Limited": "ICICIBANK.NS",
-        "SBIN — State Bank of India": "SBIN.NS",
-        "HDFCBANK — HDFC Bank Limited": "HDFCBANK.NS",
-        "TCS — Tata Consultancy Services Limited": "TCS.NS",
-        "LT — Larsen & Toubro Limited": "LT.NS",
-        "ZOMATO — Zomato Limited": "ZOMATO.NS"
+    return {
+        "ADANIPOWER — Adani Power Limited": "ADANIPOWER",
+        "RELIANCE — Reliance Industries Limited": "RELIANCE",
+        "TATASTEEL — Tata Steel Limited": "TATASTEEL",
+        "INFY — Infosys Limited": "INFY",
+        "ICICIBANK — ICICI Bank Limited": "ICICIBANK",
+        "SBIN — State Bank of India": "SBIN",
+        "HDFCBANK — HDFC Bank Limited": "HDFCBANK",
+        "TCS — Tata Consultancy Services Limited": "TCS",
+        "LT — Larsen & Toubro Limited": "LT",
+        "ZOMATO — Zomato Limited": "ZOMATO"
     }
-    return fallback
 
-nse_universe_dict = load_nse_universe()
+stock_universe = load_stock_universe()
 
 # --- LANDING PAGE (AUTHENTICATION) ---
 if not st.session_state.user:
@@ -260,7 +258,7 @@ if not st.session_state.user:
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.markdown('<div class="glow-card"><div class="stat-label">Coverage</div><div class="stat-value">2,000+</div><div style="color:var(--text-muted); font-size:0.8rem;">NSE Equities</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="glow-card"><div class="stat-label">Coverage</div><div class="stat-value">2,000+</div><div style="color:var(--text-muted); font-size:0.8rem;">NSE/BSE Equities</div></div>', unsafe_allow_html=True)
     with c2:
         st.markdown('<div class="glow-card"><div class="stat-label">Algorithm</div><div class="stat-value">10 EMA</div><div style="color:var(--text-muted); font-size:0.8rem;">Weekly Support</div></div>', unsafe_allow_html=True)
     with c3:
@@ -323,7 +321,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["📊 Terminal & Scanner", "📲 Routing & Settings", "📈 Interactive Technical Chart"])
+tab1, tab2, tab3 = st.tabs(["📊 Terminal & Scanner", "📲 Routing & Settings", "📈 TradingView Chart Terminal"])
 
 # --- TAB 1: TERMINAL SCANNER ---
 with tab1:
@@ -343,7 +341,7 @@ with tab1:
         elif scan_mode == "Nifty 50":
             symbols_to_scan = ["ADANIENT.NS", "ADANIPORTS.NS", "ASIANPAINT.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "ITC.NS", "LT.NS", "RELIANCE.NS", "SBIN.NS", "TCS.NS", "TITAN.NS"]
         else:
-            symbols_to_scan = list(nse_universe_dict.values())
+            symbols_to_scan = [f"{s}.NS" for s in stock_universe.values()]
 
         st.markdown("<br>", unsafe_allow_html=True)
         run_scan = st.button("🚀 Run Live Scanner", use_container_width=True)
@@ -480,131 +478,66 @@ with tab2:
         
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 3: INTERACTIVE TECHNICAL CHART ENGINE (AUTO-SUGGEST + DRAWINGS + INDICATORS) ---
+# --- TAB 3: TRADINGVIEW ADVANCED REAL-TIME CHART (BSE BYPASS JUGAAD) ---
 with tab3:
     st.markdown("<br>", unsafe_allow_html=True)
 
-    c_search, c_tf, c_ind = st.columns([2, 1, 2])
+    col_search, col_direct = st.columns([3, 1])
 
-    with c_search:
-        options_list = list(nse_universe_dict.keys())
-        default_index = 0
-        for i, opt in enumerate(options_list):
+    with col_search:
+        options = list(stock_universe.keys())
+        default_idx = 0
+        for i, opt in enumerate(options):
             if opt.startswith("ADANIPOWER"):
-                default_index = i
+                default_idx = i
                 break
 
         selected_label = st.selectbox(
-            "🔍 Search Stock by Name or Symbol (Auto-Suggest):",
-            options=options_list,
-            index=default_index,
-            help="Type company name (e.g. Tata, Adani, Reliance) or ticker"
+            "🔍 Search Indian Stock (By Name or Ticker):",
+            options=options,
+            index=default_idx,
+            help="Type Tata, Adani, Reliance, SBI or any ticker name"
         )
-        selected_yf_symbol = nse_universe_dict[selected_label]
-        clean_stock_ticker = selected_yf_symbol.replace(".NS", "")
+        stock_sym = stock_universe[selected_label]
 
-    with c_tf:
-        timeframe = st.selectbox("Timeframe", ["1W (Weekly)", "1D (Daily)", "1M (Monthly)"], index=0)
-        interval_map = {"1W (Weekly)": "1wk", "1D (Daily)": "1d", "1M (Monthly)": "1mo"}
-        period_map = {"1W (Weekly)": "2y", "1D (Daily)": "1y", "1M (Monthly)": "5y"}
-
-    with c_ind:
-        selected_indicators = st.multiselect(
-            "📈 Overlay Indicators:",
-            ["10 EMA", "20 EMA", "50 EMA", "200 EMA", "Volume"],
-            default=["10 EMA", "Volume"]
-        )
-
-    try:
-        data = yf.Ticker(selected_yf_symbol).history(
-            period=period_map[timeframe],
-            interval=interval_map[timeframe]
+    with col_direct:
+        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+        # Direct popout link to official TradingView full screen terminal
+        tv_direct_link = f"https://in.tradingview.com/chart/?symbol=BSE:{stock_sym}"
+        st.markdown(
+            f'<a href="{tv_direct_link}" target="_blank" style="text-decoration:none;">'
+            f'<button style="width:100%; background:linear-gradient(135deg,#00E5FF,#10B981); color:#000; font-weight:700; border:none; border-radius:8px; padding:9px 12px; cursor:pointer;">'
+            f'↗️ Open Full TV Window'
+            f'</button></a>',
+            unsafe_allow_html=True
         )
 
-        if not data.empty and len(data) >= 5:
-            # Indicator Calculations
-            if "10 EMA" in selected_indicators:
-                data["EMA10"] = ta.trend.ema_indicator(data["Close"], window=10)
-            if "20 EMA" in selected_indicators:
-                data["EMA20"] = ta.trend.ema_indicator(data["Close"], window=20)
-            if "50 EMA" in selected_indicators:
-                data["EMA50"] = ta.trend.ema_indicator(data["Close"], window=50)
-            if "200 EMA" in selected_indicators and len(data) > 200:
-                data["EMA200"] = ta.trend.ema_indicator(data["Close"], window=200)
+    st.markdown(f"### 📈 Live TradingView Terminal: `{stock_sym}` *(BSE Feed • Drawings & Indicators Enabled)*")
 
-            # Subplots for Price and Volume
-            has_vol = "Volume" in selected_indicators and "Volume" in data.columns
-            fig = make_subplots(
-                rows=2 if has_vol else 1,
-                cols=1,
-                shared_xaxes=True,
-                vertical_spacing=0.03,
-                row_heights=[0.8, 0.2] if has_vol else [1.0]
-            )
-
-            # Interactive Candlesticks
-            fig.add_trace(go.Candlestick(
-                x=data.index,
-                open=data["Open"],
-                high=data["High"],
-                low=data["Low"],
-                close=data["Close"],
-                name="Price",
-                increasing_line_color="#10B981",
-                decreasing_line_color="#EF4444"
-            ), row=1, col=1)
-
-            # EMA Lines Overlay
-            if "10 EMA" in selected_indicators and "EMA10" in data:
-                fig.add_trace(go.Scatter(x=data.index, y=data["EMA10"], line=dict(color="#00E5FF", width=1.5), name="10 EMA"), row=1, col=1)
-            if "20 EMA" in selected_indicators and "EMA20" in data:
-                fig.add_trace(go.Scatter(x=data.index, y=data["EMA20"], line=dict(color="#F59E0B", width=1.5), name="20 EMA"), row=1, col=1)
-            if "50 EMA" in selected_indicators and "EMA50" in data:
-                fig.add_trace(go.Scatter(x=data.index, y=data["EMA50"], line=dict(color="#EC4899", width=1.5), name="50 EMA"), row=1, col=1)
-            if "200 EMA" in selected_indicators and "EMA200" in data:
-                fig.add_trace(go.Scatter(x=data.index, y=data["EMA200"], line=dict(color="#8B5CF6", width=2), name="200 EMA"), row=1, col=1)
-
-            # Volume Bar Subplot
-            if has_vol:
-                colors = ["#10B981" if c >= o else "#EF4444" for c, o in zip(data["Close"], data["Open"])]
-                fig.add_trace(go.Bar(
-                    x=data.index,
-                    y=data["Volume"],
-                    marker_color=colors,
-                    name="Volume",
-                    opacity=0.5
-                ), row=2, col=1)
-
-            # High-end Dark Layout & Drawing Toolbar Enablement
-            fig.update_layout(
-                template="plotly_dark",
-                paper_bgcolor="rgba(15, 20, 31, 0.7)",
-                plot_bgcolor="rgba(5, 7, 10, 0.9)",
-                height=650,
-                margin=dict(l=10, r=10, t=30, b=10),
-                xaxis_rangeslider_visible=False,
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                dragmode="drawline"  # Default interaction: Draw Trendline
-            )
-
-            # Config with Full Drawing Tools (Lines, Rectangles, Circles, Shapes, Text)
-            config = {
-                "scrollZoom": True,
-                "displayModeBar": True,
-                "modeBarButtonsToAdd": [
-                    "drawline",
-                    "drawopenpath",
-                    "drawclosedpath",
-                    "drawcircle",
-                    "drawrect",
-                    "eraseshape"
-                ],
-                "toImageButtonOptions": {"format": "png", "filename": f"{clean_stock_ticker}_chart"}
-            }
-
-            st.plotly_chart(fig, use_container_width=True, config=config)
-            st.caption("🛠️ **Drawing Tools Active:** Use the top-right toolbar to draw trendlines, support/resistance boxes, or erase shapes.")
-        else:
-            st.error(f"No price history returned for `{clean_stock_ticker}`.")
-    except Exception as e:
-        st.error(f"Failed to fetch real-time chart: {e}")
+    # TradingView Official Advanced Real-Time Chart widget using BSE exchange bypass
+    tv_embed_code = f"""
+    <div class="tradingview-widget-container" style="height:720px;width:100%;">
+      <div id="tradingview_advanced_engine" style="height:calc(100% - 32px);width:100%;"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget({{
+        "autosize": true,
+        "symbol": "BSE:{stock_sym}",
+        "interval": "W",
+        "timezone": "Asia/Kolkata",
+        "theme": "dark",
+        "style": "1",
+        "locale": "in",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "hide_side_toolbar": false,
+        "studies": [
+          "MASimple@tv-basicstudies",
+          "EMA@tv-basicstudies"
+        ],
+        "container_id": "tradingview_advanced_engine"
+      }});
+      </script>
+    </div>
+    """
+    components.html(tv_embed_code, height=730)
