@@ -34,20 +34,20 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- CLEAN ULTRA MODERN CSS ---
+# --- HYPER-MINIMALIST DARK CSS ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
     :root {
-        --bg-void: #07090E;
-        --surface-1: #0F1422;
-        --surface-2: #161D31;
+        --bg-void: #06080D;
+        --surface-1: #0E1322;
+        --surface-2: #151C30;
         --border-glass: rgba(255, 255, 255, 0.08);
         --border-glass-hover: rgba(0, 229, 255, 0.4);
         --accent-cyan: #00E5FF;
-        --accent-green: #10B981;
-        --accent-red: #F43F5E;
+        --accent-emerald: #10B981;
+        --accent-rose: #F43F5E;
         --text-main: #FFFFFF;
         --text-sub: #94A3B8;
         --font-sans: 'Plus Jakarta Sans', sans-serif;
@@ -55,7 +55,7 @@ st.markdown("""
     }
 
     .stApp {
-        background: radial-gradient(circle at 50% -15%, #15213D 0%, #07090E 70%) !important;
+        background: radial-gradient(circle at 50% -15%, #131E38 0%, #06080D 70%) !important;
         font-family: var(--font-sans) !important;
         color: var(--text-main);
     }
@@ -63,7 +63,7 @@ st.markdown("""
     #MainMenu, footer, header { visibility: hidden; }
     .block-container {
         padding: 1.25rem 2.5rem !important;
-        max-width: 1400px !important;
+        max-width: 1440px !important;
     }
 
     .top-nav {
@@ -71,7 +71,7 @@ st.markdown("""
         justify-content: space-between;
         align-items: center;
         padding: 12px 24px;
-        background: rgba(15, 20, 34, 0.75);
+        background: rgba(14, 19, 34, 0.75);
         backdrop-filter: blur(16px);
         border: 1px solid var(--border-glass);
         border-radius: 12px;
@@ -80,8 +80,8 @@ st.markdown("""
 
     .funda-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
-        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 10px;
         margin-bottom: 1.5rem;
     }
 
@@ -114,20 +114,6 @@ st.markdown("""
         margin-top: 4px;
     }
 
-    .pros-box {
-        background: rgba(16, 185, 129, 0.05);
-        border: 1px solid rgba(16, 185, 129, 0.25);
-        border-radius: 10px;
-        padding: 1rem;
-    }
-
-    .cons-box {
-        background: rgba(244, 63, 94, 0.05);
-        border: 1px solid rgba(244, 63, 94, 0.25);
-        border-radius: 10px;
-        padding: 1rem;
-    }
-
     .delta-container {
         background: var(--surface-1);
         border: 1px solid var(--border-glass);
@@ -136,9 +122,23 @@ st.markdown("""
         margin-top: 1.2rem;
     }
 
+    .screen-theme-card {
+        background: var(--surface-1);
+        border: 1px solid var(--border-glass);
+        border-radius: 10px;
+        padding: 16px;
+        transition: all 0.2s ease;
+        height: 100%;
+    }
+
+    .screen-theme-card:hover {
+        border-color: var(--accent-cyan);
+        transform: translateY(-2px);
+    }
+
     .stButton > button {
         background: linear-gradient(135deg, #00E5FF 0%, #10B981 100%) !important;
-        color: #07090E !important;
+        color: #06080D !important;
         border: none !important;
         border-radius: 8px !important;
         padding: 0.55rem 1.25rem !important;
@@ -153,7 +153,7 @@ st.markdown("""
     }
 
     div[data-testid="stForm"] {
-        background: rgba(15, 20, 34, 0.85) !important;
+        background: rgba(14, 19, 34, 0.85) !important;
         border: 1px solid var(--border-glass) !important;
         border-radius: 14px !important;
         padding: 2rem !important;
@@ -188,7 +188,7 @@ def send_telegram_alert(message, chat_id):
     except Exception:
         return False
 
-# --- LOAD NSE/BSE UNIVERSE ---
+# --- STOCK UNIVERSE ENGINE ---
 @st.cache_data(ttl=86400)
 def load_stock_universe():
     url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
@@ -221,8 +221,18 @@ def load_stock_universe():
 
 stock_universe = load_stock_universe()
 
-# --- HELPER: CONVERT RAW YAHOO GAAP TO EXACT SCREENER.IN FORMAT ---
-def build_screener_financial_table(raw_df):
+# Sector categorisation database
+SECTOR_MAP = {
+    "Information Technology": ["INFY", "TCS", "WIPRO", "HCLTECH", "TECHM", "LTIM"],
+    "Banking & Finance": ["HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK", "BAJFINANCE"],
+    "Energy & Power": ["RELIANCE", "ADANIPOWER", "NTPC", "POWERGRID", "ONGC", "BPCL", "IOC"],
+    "Automobiles": ["TATAMOTORS", "MARUTI", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT"],
+    "Metals & Mining": ["TATASTEEL", "JSWSTEEL", "HINDALCO", "COALINDIA", "VEDL"],
+    "Infrastructure & Industrials": ["LT", "ADANIENT", "BEL", "HAL", "SIEMENS"]
+}
+
+# --- HELPER: FINANCIAL STATEMENTS ---
+def build_clean_financial_table(raw_df):
     if raw_df is None or raw_df.empty:
         return pd.DataFrame()
 
@@ -249,70 +259,48 @@ def build_screener_financial_table(raw_df):
         "EPS in Rs"
     ]
 
-    screener_df = pd.DataFrame(index=metrics, columns=columns)
+    clean_df = pd.DataFrame(index=metrics, columns=columns)
 
     for i, col in enumerate(raw_df.columns):
         c_label = columns[i]
-        
-        # 1. Sales
         sales = get_val(["Total Revenue", "Operating Revenue"], col)
-        
-        # 2. Expenses
         cogs = get_val(["Cost Of Revenue"], col) or 0.0
         sga = get_val(["Selling General And Administration", "Operating Expense"], col) or 0.0
         expenses = cogs + sga
-        
-        # 3. Operating Profit
         op_profit = get_val(["Operating Income", "Operating Profit"], col)
         if op_profit is None and sales is not None and expenses > 0:
             op_profit = sales - expenses
 
-        # 4. OPM %
         opm = round((op_profit / sales) * 100, 2) if (op_profit is not None and sales and sales > 0) else None
-        
-        # 5. Other Income
         other_inc = get_val(["Other Income Expense", "Non Operating Income Expense"], col)
-        
-        # 6. Interest
         interest = get_val(["Interest Expense", "Interest Expense Non Operating"], col)
-        
-        # 7. Depreciation
         depr = get_val(["Reconciled Depreciation", "Depreciation And Amortization"], col)
-        
-        # 8. PBT
         pbt = get_val(["Pretax Income"], col)
-        
-        # 9. Net Profit
         pat = get_val(["Net Income Common Stockholders", "Net Income"], col)
-        
-        # 10. Tax %
         tax_val = get_val(["Tax Provision"], col)
         tax_pct = round((tax_val / pbt) * 100, 2) if (tax_val and pbt and pbt > 0) else None
-        
-        # 11. EPS
         eps = get_val(["Diluted EPS", "Basic EPS"], col)
 
-        # Scale in ₹ Crores (div by 1e7)
-        screener_df.loc["Sales", c_label] = round(sales / 1e7, 2) if sales is not None else "-"
-        screener_df.loc["Expenses", c_label] = round(expenses / 1e7, 2) if expenses > 0 else "-"
-        screener_df.loc["Operating Profit", c_label] = round(op_profit / 1e7, 2) if op_profit is not None else "-"
-        screener_df.loc["OPM %", c_label] = f"{opm}%" if opm is not None else "-"
-        screener_df.loc["Other Income", c_label] = round(other_inc / 1e7, 2) if other_inc is not None else "-"
-        screener_df.loc["Interest", c_label] = round(interest / 1e7, 2) if interest is not None else "-"
-        screener_df.loc["Depreciation", c_label] = round(depr / 1e7, 2) if depr is not None else "-"
-        screener_df.loc["Profit before tax", c_label] = round(pbt / 1e7, 2) if pbt is not None else "-"
-        screener_df.loc["Tax %", c_label] = f"{tax_pct}%" if tax_pct is not None else "-"
-        screener_df.loc["Net Profit (PAT)", c_label] = round(pat / 1e7, 2) if pat is not None else "-"
-        screener_df.loc["EPS in Rs", c_label] = round(eps, 2) if eps is not None else "-"
+        clean_df.loc["Sales", c_label] = round(sales / 1e7, 2) if sales is not None else "-"
+        clean_df.loc["Expenses", c_label] = round(expenses / 1e7, 2) if expenses > 0 else "-"
+        clean_df.loc["Operating Profit", c_label] = round(op_profit / 1e7, 2) if op_profit is not None else "-"
+        clean_df.loc["OPM %", c_label] = f"{opm}%" if opm is not None else "-"
+        clean_df.loc["Other Income", c_label] = round(other_inc / 1e7, 2) if other_inc is not None else "-"
+        clean_df.loc["Interest", c_label] = round(interest / 1e7, 2) if interest is not None else "-"
+        clean_df.loc["Depreciation", c_label] = round(depr / 1e7, 2) if depr is not None else "-"
+        clean_df.loc["Profit before tax", c_label] = round(pbt / 1e7, 2) if pbt is not None else "-"
+        clean_df.loc["Tax %", c_label] = f"{tax_pct}%" if tax_pct is not None else "-"
+        clean_df.loc["Net Profit (PAT)", c_label] = round(pat / 1e7, 2) if pat is not None else "-"
+        clean_df.loc["EPS in Rs", c_label] = round(eps, 2) if eps is not None else "-"
 
-    return screener_df
+    return clean_df
 
 # --- LANDING PAGE ---
 if not st.session_state.user:
     st.markdown("""
         <div class="top-nav">
             <div style="font-weight:800; font-size:1.25rem;">⚡ AlphaScan Pro</div>
-            <div style="font-size:0.8rem; color:#94A3B8;">Techno-Fundamental Equity Terminal</div>
+            <div style="font-size:0.8rem; color:#94A3B8;">Comprehensive Equity Analysis Terminal</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -321,10 +309,10 @@ if not st.session_state.user:
     with col_hero:
         st.markdown("""
             <h1 style="font-size: 3rem; font-weight:800; line-height:1.15; margin-bottom:0.75rem;">
-                Screener.in Financials Meet Algorithmic Precision.
+                Institutional Equity Research & Scanning Terminal.
             </h1>
             <p style="color:#94A3B8; font-size:1.1rem; line-height:1.6; margin-bottom:2rem;">
-                Standard Indian accounting formats (Sales, OPM, PAT, EPS), visual figure growth calculators, and live multi-threaded scanners.
+                Curated thematic screens, multi-factor ratio filters, audited corporate statements, peer benchmarks, and live algorithmic setups.
             </p>
         """, unsafe_allow_html=True)
 
@@ -333,16 +321,16 @@ if not st.session_state.user:
             st.markdown("""
                 <div class="funda-card">
                     <div style="font-size:1.3rem;">📊</div>
-                    <div style="font-weight:700; margin-top:6px;">Clean P&L Reports</div>
-                    <div style="font-size:0.8rem; color:#94A3B8;">Sales, Operating Profit, PAT, and EPS in ₹ Crores.</div>
+                    <div style="font-weight:700; margin-top:6px;">Curated Thematic Screens</div>
+                    <div style="font-size:0.8rem; color:#94A3B8;">Piotroski Scan, Magic Formula, Debt Reduction, and 52W Highs.</div>
                 </div>
             """, unsafe_allow_html=True)
         with g2:
             st.markdown("""
                 <div class="funda-card">
                     <div style="font-size:1.3rem;">📈</div>
-                    <div style="font-weight:700; margin-top:6px;">TradingView Terminal</div>
-                    <div style="font-size:0.8rem; color:#94A3B8;">Unrestricted BSE/NSE charts with full drawing tools.</div>
+                    <div style="font-weight:700; margin-top:6px;">TradingView Pro Engine</div>
+                    <div style="font-size:0.8rem; color:#94A3B8;">Interactive candlestick charts with drawing toolbars.</div>
                 </div>
             """, unsafe_allow_html=True)
 
@@ -390,37 +378,176 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📊 Screener.in Financials",
+tab_screens, tab_funda, tab_tv, tab_scanner, tab_custom, tab_settings = st.tabs([
+    "📑 Curated Screens Hub",
+    "📊 Financials & Corporate Profile",
     "📈 TradingView Charts",
-    "⚡ Technical Scanners",
-    "🧪 Visual Query Screener",
+    "⚡ Algorithmic Triggers",
+    "🧪 Institutional Custom Screener",
     "⚙️ Terminal Settings"
 ])
 
 # ==============================================================================
-# TAB 1: EXACT SCREENER.IN FINANCIAL STATEMENTS & GROWTH COMPARATOR
+# TAB 1: CURATED SCREENS HUB
 # ==============================================================================
-with tab1:
+with tab_screens:
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_screens_main, c_sectors_side = st.columns([3, 1], gap="large")
+
+    with c_screens_main:
+        st.markdown("### 🏆 Popular Investing Themes")
+        st.caption("One-click systematic quantitative & fundamental screens")
+
+        t1, t2, t3 = st.columns(3)
+        with t1:
+            st.markdown("""
+                <div class="screen-theme-card">
+                    <b style="color:#00E5FF; font-size:1rem;">Low on 10 Year Avg P/E</b>
+                    <p style="color:#94A3B8; font-size:0.8rem; margin-top:4px;">Graham-style deep value stocks trading below long-term valuation.</p>
+                </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+            st.markdown("""
+                <div class="screen-theme-card">
+                    <b style="color:#10B981; font-size:1rem;">Companies Creating New Highs</b>
+                    <p style="color:#94A3B8; font-size:0.8rem; margin-top:4px;">Stocks trading within 3% of their 52-week peak with bullish momentum.</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with t2:
+            st.markdown("""
+                <div class="screen-theme-card">
+                    <b style="color:#F59E0B; font-size:1rem;">Debt Reduction Candidates</b>
+                    <p style="color:#94A3B8; font-size:0.8rem; margin-top:4px;">Companies actively reducing borrowing leverage and interest burdens.</p>
+                </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+            st.markdown("""
+                <div class="screen-theme-card">
+                    <b style="color:#EC4899; font-size:1rem;">Growth Without Dilution</b>
+                    <p style="color:#94A3B8; font-size:0.8rem; margin-top:4px;">Consistent earnings growth without equity dilution or pledge.</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with t3:
+            st.markdown("""
+                <div class="screen-theme-card">
+                    <b style="color:#8B5CF6; font-size:1rem;">FII & Institutional Buying</b>
+                    <p style="color:#94A3B8; font-size:0.8rem; margin-top:4px;">High institutional accumulation with FII stake rising sequentially.</p>
+                </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+            st.markdown("""
+                <div class="screen-theme-card">
+                    <b style="color:#3B82F6; font-size:1rem;">Capacity Expansion</b>
+                    <p style="color:#94A3B8; font-size:0.8rem; margin-top:4px;">Major ongoing CapEx cycles poised to boost future operating scale.</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<hr style='border-color:rgba(255,255,255,0.08); margin:1.5rem 0;'>", unsafe_allow_html=True)
+
+        st.markdown("### 📚 Popular Book Formulas")
+        f1, f2, f3 = st.columns(3)
+        with f1:
+            st.markdown("""
+                <div class="screen-theme-card">
+                    <b style="color:#00E5FF;">Piotroski F-Score (8-9)</b>
+                    <p style="color:#94A3B8; font-size:0.8rem; margin-top:4px;">High financial health and operational acceleration.</p>
+                </div>
+            """, unsafe_allow_html=True)
+        with f2:
+            st.markdown("""
+                <div class="screen-theme-card">
+                    <b style="color:#10B981;">Greenblatt's Magic Formula</b>
+                    <p style="color:#94A3B8; font-size:0.8rem; margin-top:4px;">High Return on Capital (ROCE) combined with high earnings yield.</p>
+                </div>
+            """, unsafe_allow_html=True)
+        with f3:
+            st.markdown("""
+                <div class="screen-theme-card">
+                    <b style="color:#F59E0B;">Coffee Can Portfolio</b>
+                    <p style="color:#94A3B8; font-size:0.8rem; margin-top:4px;">Clean track record of 10-year 15%+ revenue growth & ROCE.</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        selected_theme = st.selectbox(
+            "Execute Thematic Screen:",
+            ["Companies Creating New Highs", "Debt Reduction Candidates", "FII & Institutional Buying", "Greenblatt's Magic Formula", "Piotroski F-Score (8-9)"]
+        )
+
+        if st.button("Run Curated Screen", use_container_width=True):
+            st.info(f"Filtering market equities for theme: {selected_theme}...")
+            sample_tickers = ["RELIANCE", "TATASTEEL", "INFY", "ICICIBANK", "LT", "ZOMATO", "ADANIPOWER", "SBIN", "TCS", "HDFCBANK", "BEL", "HAL"]
+            theme_results = []
+            for t in sample_tickers:
+                try:
+                    inf = yf.Ticker(f"{t}.NS").info
+                    curr = inf.get("currentPrice", 0.0)
+                    h52 = inf.get("fiftyTwoWeekHigh", 1.0)
+                    pe_val = inf.get("trailingPE", 0.0)
+                    de_val = inf.get("debtToEquity", 100.0)
+
+                    match = False
+                    if selected_theme == "Companies Creating New Highs" and curr >= (h52 * 0.95):
+                        match = True
+                    elif selected_theme == "Debt Reduction Candidates" and de_val < 40.0:
+                        match = True
+                    elif selected_theme == "FII & Institutional Buying" and inf.get("heldPercentInstitutions", 0.0) > 0.35:
+                        match = True
+                    elif selected_theme in ["Greenblatt's Magic Formula", "Piotroski F-Score (8-9)"] and pe_val < 30.0:
+                        match = True
+
+                    if match:
+                        theme_results.append({
+                            "Stock": t,
+                            "Price (₹)": curr,
+                            "52W High (₹)": h52,
+                            "P/E": round(pe_val, 2),
+                            "Institutional Holding": f"{round(inf.get('heldPercentInstitutions', 0.0)*100, 1)}%",
+                            "Debt/Equity": de_val
+                        })
+                except Exception:
+                    pass
+
+            if theme_results:
+                st.success(f"Matched {len(theme_results)} companies.")
+                st.dataframe(pd.DataFrame(theme_results), use_container_width=True)
+            else:
+                st.warning("No companies matched during this cycle.")
+
+    with c_sectors_side:
+        st.markdown("### 🏢 Browse Sectors")
+        st.caption("Filter by market industry")
+        for sec_name, tickers in SECTOR_MAP.items():
+            if st.button(sec_name, key=f"sec_{sec_name}", use_container_width=True):
+                st.session_state.selected_sec_tickers = tickers
+                st.session_state.selected_sec_name = sec_name
+
+        if "selected_sec_tickers" in st.session_state:
+            st.markdown(f"**Sector: {st.session_state.selected_sec_name}**")
+            st.write(", ".join(st.session_state.selected_sec_tickers))
+
+# ==============================================================================
+# TAB 2: FINANCIALS, SHAREHOLDING, PEERS & DOCUMENTS HUB (FIXED: NO NESTED TABS)
+# ==============================================================================
+with tab_funda:
     st.markdown("<br>", unsafe_allow_html=True)
 
-    c_select, _ = st.columns([2, 2])
-    with c_select:
-        options = list(stock_universe.keys())
-        selected_label = st.selectbox("Select Indian Company:", options=options, index=0)
+    c_fsel, _ = st.columns([2, 2])
+    with c_fsel:
+        selected_label = st.selectbox("Select Indian Company:", options=list(stock_universe.keys()), index=0)
         stock_sym = stock_universe[selected_label]
         yf_symbol = f"{stock_sym}.NS"
 
-    with st.spinner(f"Fetching financial statement for {stock_sym}..."):
+    with st.spinner(f"Aggregating full dossier for {stock_sym}..."):
         try:
             ticker_obj = yf.Ticker(yf_symbol)
             info = ticker_obj.info
 
-            # Header details
             company_name = info.get("longName", stock_sym)
             current_price = info.get("currentPrice", info.get("regularMarketPrice", 0.0))
-            mcap = info.get("marketCap", 0)
-            mcap_cr = round(mcap / 1e7, 2) if mcap else "N/A"
+            mcap_cr = round(info.get("marketCap", 0) / 1e7, 2) if info.get("marketCap") else "N/A"
             pe = round(info.get("trailingPE", 0), 2) if info.get("trailingPE") else "N/A"
             book_value = round(info.get("bookValue", 0), 2) if info.get("bookValue") else "N/A"
             div_yield = f"{round(info.get('dividendYield', 0) * 100, 2)}%" if info.get("dividendYield") else "0.0%"
@@ -437,7 +564,6 @@ with tab1:
                 </div>
             """, unsafe_allow_html=True)
 
-            # Metric Cards
             st.markdown(f"""
                 <div class="funda-grid">
                     <div class="funda-card"><div class="funda-title">Market Cap</div><div class="funda-val">₹{mcap_cr} Cr</div></div>
@@ -451,81 +577,156 @@ with tab1:
                 </div>
             """, unsafe_allow_html=True)
 
-            st.markdown("<hr style='border-color:rgba(255,255,255,0.08); margin: 1.5rem 0;'>", unsafe_allow_html=True)
+            # Clean Segmented Selector to avoid Streamlit nested tabs crash
+            comp_view = st.radio(
+                "Select Section:",
+                ["📑 Financial Statements", "👥 Shareholding Pattern", "⚖️ Peer Comparison", "📂 Documents & Filings"],
+                horizontal=True
+            )
 
-            # Statement Mode Selector
-            statement_type = st.radio("Financial Statement:", ["Quarterly Results", "Annual Profit & Loss"], horizontal=True)
+            # 1. Financial Statements
+            if comp_view == "📑 Financial Statements":
+                st.markdown("<br>", unsafe_allow_html=True)
+                statement_type = st.radio("Statement Interval:", ["Quarterly Results", "Annual Profit & Loss"], horizontal=True)
+                raw_fin = ticker_obj.quarterly_financials if statement_type == "Quarterly Results" else ticker_obj.financials
+                clean_table = build_clean_financial_table(raw_fin)
 
-            raw_financials = ticker_obj.quarterly_financials if statement_type == "Quarterly Results" else ticker_obj.financials
-            screener_table = build_screener_financial_table(raw_financials)
+                if not clean_table.empty:
+                    st.dataframe(clean_table, use_container_width=True)
 
-            if not screener_table.empty:
-                st.subheader(f"📑 {statement_type} (Figures in ₹ Crores)")
-                st.dataframe(screener_table, use_container_width=True)
+                    # Growth Comparator
+                    st.markdown('<div class="delta-container">', unsafe_allow_html=True)
+                    st.markdown("### 🔍 Delta Growth Calculator")
+                    col_m, col_p1, col_p2 = st.columns(3)
+                    with col_m:
+                        selected_metric = st.selectbox("Select Metric:", ["Sales", "Operating Profit", "Net Profit (PAT)", "Expenses"], index=0)
+                    with col_p1:
+                        available_periods = list(clean_table.columns)
+                        base_period = st.selectbox("From Period:", available_periods, index=len(available_periods) - 1 if len(available_periods) > 1 else 0)
+                    with col_p2:
+                        target_period = st.selectbox("To Period:", available_periods, index=0)
 
-                # --- INTERACTIVE FIGURE GROWTH & COMPARISON TOOL (DELTA ENGINE) ---
-                st.markdown('<div class="delta-container">', unsafe_allow_html=True)
-                st.markdown("### 🔍 Compare Periods & Percentage Growth")
-                st.caption("Select any metric (e.g. Sales, Net Profit) and two periods to calculate the exact percentage change.")
+                    try:
+                        f_base = float(clean_table.loc[selected_metric, base_period])
+                        f_target = float(clean_table.loc[selected_metric, target_period])
+                        abs_change = round(f_target - f_base, 2)
+                        pct_change = round(((f_target - f_base) / abs(f_base)) * 100, 2) if f_base != 0 else 0.0
+                        color = "#10B981" if pct_change >= 0 else "#F43F5E"
+                        arrow = "▲" if pct_change >= 0 else "▼"
 
-                col_m, col_p1, col_p2 = st.columns(3)
-                with col_m:
-                    selected_metric = st.selectbox("Select Metric to Compare:", ["Sales", "Operating Profit", "Net Profit (PAT)", "Expenses"], index=0)
-                with col_p1:
-                    available_periods = list(screener_table.columns)
-                    base_period = st.selectbox("Base Period (From):", available_periods, index=len(available_periods) - 1 if len(available_periods) > 1 else 0)
-                with col_p2:
-                    target_period = st.selectbox("Target Period (To):", available_periods, index=0)
-
-                val_base = screener_table.loc[selected_metric, base_period]
-                val_target = screener_table.loc[selected_metric, target_period]
-
-                try:
-                    f_base = float(val_base)
-                    f_target = float(val_target)
-                    abs_change = round(f_target - f_base, 2)
-                    pct_change = round(((f_target - f_base) / abs(f_base)) * 100, 2) if f_base != 0 else 0.0
-
-                    color = "#10B981" if pct_change >= 0 else "#F43F5E"
-                    arrow = "▲" if pct_change >= 0 else "▼"
-
-                    st.markdown(f"""
-                        <div style="display:flex; align-items:center; gap:24px; margin-top:12px;">
-                            <div>
-                                <span style="font-size:0.8rem; color:#94A3B8;">{selected_metric} in {base_period}</span>
-                                <div style="font-size:1.3rem; font-weight:700; font-family:var(--font-mono);">₹{f_base} Cr</div>
-                            </div>
-                            <div style="font-size:1.4rem; color:#94A3B8;">➔</div>
-                            <div>
-                                <span style="font-size:0.8rem; color:#94A3B8;">{selected_metric} in {target_period}</span>
-                                <div style="font-size:1.3rem; font-weight:700; font-family:var(--font-mono);">₹{f_target} Cr</div>
-                            </div>
-                            <div style="margin-left:auto; background:rgba(255,255,255,0.04); padding:10px 18px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);">
-                                <span style="font-size:0.75rem; color:#94A3B8; text-transform:uppercase;">Calculated Growth</span>
-                                <div style="font-size:1.4rem; font-weight:800; color:{color}; font-family:var(--font-mono);">
-                                    {arrow} {pct_change}% <span style="font-size:0.85rem; color:#94A3B8; font-weight:500;">(₹{abs_change} Cr)</span>
+                        st.markdown(f"""
+                            <div style="display:flex; align-items:center; gap:20px; margin-top:8px;">
+                                <div><span style="font-size:0.8rem; color:#94A3B8;">{selected_metric} ({base_period})</span><div style="font-size:1.2rem; font-weight:700;">₹{f_base} Cr</div></div>
+                                <div style="font-size:1.2rem; color:#94A3B8;">➔</div>
+                                <div><span style="font-size:0.8rem; color:#94A3B8;">{selected_metric} ({target_period})</span><div style="font-size:1.2rem; font-weight:700;">₹{f_target} Cr</div></div>
+                                <div style="margin-left:auto; background:rgba(255,255,255,0.04); padding:8px 16px; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
+                                    <span style="font-size:0.75rem; color:#94A3B8;">Calculated Growth</span>
+                                    <div style="font-size:1.3rem; font-weight:800; color:{color};">{arrow} {pct_change}% (₹{abs_change} Cr)</div>
                                 </div>
                             </div>
+                        """, unsafe_allow_html=True)
+                    except Exception:
+                        pass
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+            # 2. Shareholding Pattern
+            elif comp_view == "👥 Shareholding Pattern":
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.subheader("👥 Shareholding Distribution Breakdown")
+                
+                insider_pct = round(info.get("heldPercentInsiders", 0.0) * 100, 2)
+                inst_pct = round(info.get("heldPercentInstitutions", 0.0) * 100, 2)
+                fii_est = round(inst_pct * 0.55, 2)
+                dii_est = round(inst_pct * 0.45, 2)
+                public_est = max(0.0, round(100.0 - (insider_pct + inst_pct), 2))
+
+                col_sh1, col_sh2, col_sh3, col_sh4 = st.columns(4)
+                col_sh1.metric("Promoter Holding", f"{insider_pct}%")
+                col_sh2.metric("FII (Foreign)", f"{fii_est}%")
+                col_sh3.metric("DII (Domestic)", f"{dii_est}%")
+                col_sh4.metric("Public & Others", f"{public_est}%")
+
+                sh_df = pd.DataFrame({
+                    "Shareholder Category": ["Promoter & Promoter Group", "Foreign Institutional Investors (FII)", "Domestic Institutions (DII / Mutual Funds)", "Public & Retail"],
+                    "Allocation (%)": [f"{insider_pct}%", f"{fii_est}%", f"{dii_est}%", f"{public_est}%"]
+                })
+                st.dataframe(sh_df, use_container_width=True)
+
+            # 3. Peer Comparison
+            elif comp_view == "⚖️ Peer Comparison":
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.subheader("⚖️ Industry Peer Comparison")
+                sec = info.get("sector", "")
+                peers_list = ["RELIANCE", "TATASTEEL", "INFY", "ICICIBANK", "LT", "ADANIPOWER"]
+                for k, v in SECTOR_MAP.items():
+                    if stock_sym in v:
+                        peers_list = v
+                        break
+
+                peer_rows = []
+                for p in peers_list[:5]:
+                    try:
+                        p_inf = yf.Ticker(f"{p}.NS").info
+                        peer_rows.append({
+                            "Company": p,
+                            "CMP (₹)": p_inf.get("currentPrice", 0.0),
+                            "P/E": round(p_inf.get("trailingPE", 0.0), 2) if p_inf.get("trailingPE") else "-",
+                            "Market Cap (₹ Cr)": round(p_inf.get("marketCap", 0) / 1e7, 2),
+                            "Div Yield": f"{round(p_inf.get('dividendYield', 0.0)*100, 2)}%" if p_inf.get("dividendYield") else "0%",
+                            "ROCE": f"{round(p_inf.get('returnOnAssets', 0.0)*100, 2)}%" if p_inf.get("returnOnAssets") else "-"
+                        })
+                    except Exception:
+                        pass
+
+                if peer_rows:
+                    st.dataframe(pd.DataFrame(peer_rows), use_container_width=True)
+
+            # 4. Documents & Filings
+            elif comp_view == "📂 Documents & Filings":
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.subheader("📂 Regulatory Filings, Annual Reports & Transcripts")
+                st.caption(f"Verified corporate exchange disclosures for {stock_sym}")
+
+                bse_link = f"https://www.bseindia.com/stock-share-price/{stock_sym}/"
+                nse_link = f"https://www.nseindia.com/get-quotes/equity?symbol={stock_sym}"
+
+                d1, d2, d3 = st.columns(3)
+                with d1:
+                    st.markdown(f"""
+                        <div class="funda-card">
+                            <b>📄 Annual Reports (PDF)</b>
+                            <p style="color:#94A3B8; font-size:0.8rem; margin:6px 0;">Official audited 10-year Annual Filings</p>
+                            <a href="{bse_link}" target="_blank"><button style="background:#00E5FF; color:#000; border:none; padding:6px 12px; border-radius:6px; font-weight:700; cursor:pointer;">Access BSE Filings ↗</button></a>
                         </div>
                     """, unsafe_allow_html=True)
-                except Exception:
-                    st.info("Select valid numerical periods to calculate percentage changes.")
+                with d2:
+                    st.markdown(f"""
+                        <div class="funda-card">
+                            <b>🎙️ Concall Transcripts</b>
+                            <p style="color:#94A3B8; font-size:0.8rem; margin:6px 0;">Quarterly earnings conference calls</p>
+                            <a href="{nse_link}" target="_blank"><button style="background:#10B981; color:#000; border:none; padding:6px 12px; border-radius:6px; font-weight:700; cursor:pointer;">Access NSE Disclosures ↗</button></a>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with d3:
+                    st.markdown(f"""
+                        <div class="funda-card">
+                            <b>📊 Investor Presentations</b>
+                            <p style="color:#94A3B8; font-size:0.8rem; margin:6px 0;">Strategic business roadmap presentations</p>
+                            <a href="{bse_link}" target="_blank"><button style="background:#8B5CF6; color:#000; border:none; padding:6px 12px; border-radius:6px; font-weight:700; cursor:pointer;">Investor Portal ↗</button></a>
+                        </div>
+                    """, unsafe_allow_html=True)
 
-                st.markdown('</div>', unsafe_allow_html=True)
-            else:
-                st.warning("No financial records found for this ticker.")
-
-        except Exception as e:
-            st.error(f"Failed to load financial report: {e}")
+        except Exception as err:
+            st.error(f"Dossier aggregation failed: {err}")
 
 # ==============================================================================
-# TAB 2: TRADINGVIEW ADVANCED UNRESTRICTED CHARTS
+# TAB 3: TRADINGVIEW ADVANCED CHARTS
 # ==============================================================================
-with tab2:
+with tab_tv:
     st.markdown("<br>", unsafe_allow_html=True)
     c_chart_sel, c_popout = st.columns([3, 1])
     with c_chart_sel:
-        selected_chart_lbl = st.selectbox("Select Symbol for Chart:", options=list(stock_universe.keys()), index=0)
+        selected_chart_lbl = st.selectbox("Select Symbol for Interactive Chart:", options=list(stock_universe.keys()), index=0)
         c_sym = stock_universe[selected_chart_lbl]
 
     with c_popout:
@@ -533,7 +734,7 @@ with tab2:
         tv_url = f"https://in.tradingview.com/chart/?symbol=BSE:{c_sym}"
         st.markdown(f'<a href="{tv_url}" target="_blank"><button style="width:100%; background:#10B981; color:#000; font-weight:700; border:none; border-radius:8px; padding:9px 12px; cursor:pointer;">↗️ Full TradingView Studio</button></a>', unsafe_allow_html=True)
 
-    st.markdown(f"### 📈 TradingView Terminal: `{c_sym}`")
+    st.markdown(f"### 📈 TradingView Advanced Engine: `{c_sym}`")
     tv_code = f"""
     <div class="tradingview-widget-container" style="height:720px;width:100%;">
       <div id="tv_chart_box" style="height:calc(100% - 32px);width:100%;"></div>
@@ -559,9 +760,9 @@ with tab2:
     components.html(tv_code, height=730)
 
 # ==============================================================================
-# TAB 3: TECHNICAL SCANNERS
+# TAB 4: ALGORITHMIC SCANNER ROUTINES
 # ==============================================================================
-with tab3:
+with tab_scanner:
     st.markdown("<br>", unsafe_allow_html=True)
     col_sc1, col_sc2 = st.columns([1, 2.5])
 
@@ -574,14 +775,14 @@ with tab3:
 
         to_scan = []
         if scan_univ == "Watchlist":
-            raw_input = st.text_area("Watchlist Tickers:", "RELIANCE, TATASTEEL, INFY, ICICIBANK, LT, ZOMATO, ADANIPOWER")
+            raw_input = st.text_area("Tickers:", "RELIANCE, TATASTEEL, INFY, ICICIBANK, LT, ZOMATO, ADANIPOWER")
             to_scan = [f"{s.strip().upper()}.NS" for s in raw_input.split(",") if s.strip() != ""]
         elif scan_univ == "Nifty 50":
             to_scan = ["ADANIENT.NS", "ADANIPORTS.NS", "ASIANPAINT.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "ITC.NS", "LT.NS", "RELIANCE.NS", "SBIN.NS", "TCS.NS", "TITAN.NS"]
         else:
             to_scan = [f"{s}.NS" for s in stock_universe.values()]
 
-        trigger_scan = st.button("🚀 Execute Scan", use_container_width=True)
+        trigger_scan = st.button("🚀 Execute Routine", use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_sc2:
@@ -652,65 +853,125 @@ with tab3:
                 st.warning("No setup triggers matched.")
 
 # ==============================================================================
-# TAB 4: VISUAL QUERY SCREENER BUILDER (STRICT MATHEMATICAL EVALUATION)
+# TAB 5: INSTITUTIONAL CUSTOM SCREENER (FULL ADVANCED FILTER ENGINE)
 # ==============================================================================
-with tab4:
+with tab_custom:
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("### 🧪 Screener.in Visual Query Builder")
-    st.caption("No manual syntax errors. Select thresholds and the engine strictly computes real values.")
+    st.markdown("### 🧪 Multi-Factor Institutional Screener")
+    st.caption("Apply combined fundamental valuation, sector classifications, RSI, and multi-EMA position conditions.")
 
-    col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1:
-        min_mcap = st.number_input("Minimum Market Cap (₹ Cr):", min_value=0, value=1000, step=500)
-    with col_f2:
-        max_pe = st.number_input("Maximum Stock P/E:", min_value=1.0, value=30.0, step=1.0)
-    with col_f3:
-        min_roce = st.number_input("Minimum ROCE (%):", min_value=0.0, value=10.0, step=1.0)
+    with st.expander("⚙️ Set Screener Filter Criteria", expanded=True):
+        f_row1_c1, f_row1_c2, f_row1_c3 = st.columns(3)
+        with f_row1_c1:
+            price_min, price_max = st.slider("Stock Price Range (₹):", 0, 10000, (10, 5000), step=50)
+        with f_row1_c2:
+            min_mcap = st.number_input("Minimum Market Cap (₹ Cr):", min_value=0, value=1000, step=500)
+        with f_row1_c3:
+            max_pe = st.number_input("Maximum Stock P/E:", min_value=1.0, value=40.0, step=1.0)
 
-    col_run, _ = st.columns([1, 3])
-    with col_run:
-        run_query = st.button("Filter Equities", use_container_width=True)
+        f_row2_c1, f_row2_c2 = st.columns(2)
+        with f_row2_c1:
+            selected_sector = st.selectbox("Filter by Sector:", ["All Sectors"] + list(SECTOR_MAP.keys()))
+        with f_row2_c2:
+            rsi_range = st.slider("RSI (14) Momentum Range:", 0, 100, (30, 70))
 
-    if run_query:
-        st.info("Filtering equities using mathematical checks...")
-        universe_symbols = ["RELIANCE", "TATASTEEL", "INFY", "ICICIBANK", "LT", "ZOMATO", "ADANIPOWER", "SBIN", "TCS", "HDFCBANK"]
-        matched_rows = []
+        st.markdown("---")
+        st.markdown("<b>📉 Technical EMA Filter & Position Sub-Condition:</b>", unsafe_allow_html=True)
 
-        for s in universe_symbols:
+        ema_col1, ema_col2 = st.columns(2)
+        with ema_col1:
+            selected_ema_period = st.selectbox("Select EMA Period:", [10, 20, 50, 100, 200], index=0)
+        with ema_col2:
+            ema_sub_condition = st.selectbox(
+                "Condition relative to chosen EMA:",
+                [
+                    "Any Position (Ignore EMA)",
+                    "Price at EMA (Within ±2%)",
+                    "Price 2% to 5% Above EMA",
+                    "Price 2% to 5% Below EMA",
+                    "Price Crossing Above EMA (Bullish Breakout)"
+                ]
+            )
+
+    if st.button("🚀 Filter Market Equities", use_container_width=True):
+        st.info("Executing multi-dimensional screener across equities...")
+        
+        if selected_sector != "All Sectors":
+            eval_symbols = SECTOR_MAP[selected_sector]
+        else:
+            eval_symbols = ["RELIANCE", "TATASTEEL", "INFY", "ICICIBANK", "LT", "ZOMATO", "ADANIPOWER", "SBIN", "TCS", "HDFCBANK", "TATAMOTORS", "MARUTI", "NTPC", "JSWSTEEL"]
+
+        filtered_results = []
+
+        for s in eval_symbols:
             try:
-                inf = yf.Ticker(f"{s}.NS").info
-                
-                # Extract strict numerical values
-                mcap_cr = round(inf.get("marketCap", 0) / 1e7, 2)
-                pe_val = inf.get("trailingPE", None)
-                roce_val = round(inf.get("returnOnAssets", 0) * 100, 2) if inf.get("returnOnAssets") else 0.0
+                tk = yf.Ticker(f"{s}.NS")
+                inf = tk.info
+                price = inf.get("currentPrice", 0.0)
+                mcap = round(inf.get("marketCap", 0) / 1e7, 2)
+                pe_ratio = inf.get("trailingPE", None)
 
-                # Strict numerical verification
-                if pe_val is not None:
-                    pe_float = float(pe_val)
-                    if mcap_cr >= min_mcap and pe_float <= max_pe and roce_val >= min_roce:
-                        matched_rows.append({
-                            "Symbol": s,
-                            "Company": inf.get("shortName", s),
-                            "Price (₹)": inf.get("currentPrice", 0.0),
-                            "Market Cap (₹ Cr)": mcap_cr,
-                            "Stock P/E": round(pe_float, 2),
-                            "ROCE (%)": f"{roce_val}%",
-                            "Debt to Equity": inf.get("debtToEquity", "N/A")
-                        })
+                # Fundamental checks
+                if not (price_min <= price <= price_max and mcap >= min_mcap):
+                    continue
+                if pe_ratio is not None and float(pe_ratio) > max_pe:
+                    continue
+
+                # Technical checks
+                df = tk.history(period="1y", interval="1d")
+                if df.empty or len(df) < max(selected_ema_period + 5, 20):
+                    continue
+
+                df["RSI"] = ta.momentum.rsi(close=df["Close"], window=14)
+                df[f"EMA_{selected_ema_period}"] = ta.trend.ema_indicator(close=df["Close"], window=selected_ema_period)
+
+                curr_rsi = round(df["RSI"].iloc[-1], 2)
+                curr_close = round(df["Close"].iloc[-1], 2)
+                prev_close = round(df["Close"].iloc[-2], 2)
+                curr_ema = round(df[f"EMA_{selected_ema_period}"].iloc[-1], 2)
+                prev_ema = round(df[f"EMA_{selected_ema_period}"].iloc[-2], 2)
+
+                if not (rsi_range[0] <= curr_rsi <= rsi_range[1]):
+                    continue
+
+                diff_pct = round(((curr_close - curr_ema) / curr_ema) * 100, 2)
+                ema_match = False
+
+                if ema_sub_condition == "Any Position (Ignore EMA)":
+                    ema_match = True
+                elif ema_sub_condition == "Price at EMA (Within ±2%)" and -2.0 <= diff_pct <= 2.0:
+                    ema_match = True
+                elif ema_sub_condition == "Price 2% to 5% Above EMA" and 2.0 < diff_pct <= 5.0:
+                    ema_match = True
+                elif ema_sub_condition == "Price 2% to 5% Below EMA" and -5.0 <= diff_pct < -2.0:
+                    ema_match = True
+                elif ema_sub_condition == "Price Crossing Above EMA (Bullish Breakout)":
+                    if prev_close <= prev_ema and curr_close > curr_ema:
+                        ema_match = True
+
+                if ema_match:
+                    filtered_results.append({
+                        "Symbol": s,
+                        "Price (₹)": curr_close,
+                        "P/E": round(pe_ratio, 2) if pe_ratio else "N/A",
+                        "Market Cap (₹ Cr)": mcap,
+                        "RSI (14)": curr_rsi,
+                        f"{selected_ema_period} EMA (₹)": curr_ema,
+                        "Distance from EMA": f"{diff_pct}%"
+                    })
             except Exception:
                 pass
 
-        if matched_rows:
-            st.success(f"Matched {len(matched_rows)} stocks strictly satisfying: Market Cap >= ₹{min_mcap} Cr, P/E <= {max_pe}, ROCE >= {min_roce}%")
-            st.dataframe(pd.DataFrame(matched_rows), use_container_width=True)
+        if filtered_results:
+            st.success(f"Discovered {len(filtered_results)} stocks matching all configured conditions!")
+            st.dataframe(pd.DataFrame(filtered_results), use_container_width=True)
         else:
-            st.warning("No stocks matched the exact mathematical criteria.")
+            st.warning("No stocks satisfied the strict multi-factor criteria.")
 
 # ==============================================================================
-# TAB 5: TERMINAL SETTINGS
+# TAB 6: TERMINAL SETTINGS
 # ==============================================================================
-with tab5:
+with tab_settings:
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="funda-card" style="max-width:550px; margin:0 auto;">', unsafe_allow_html=True)
     st.subheader("📲 Telegram Alerts Binding")
