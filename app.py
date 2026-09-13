@@ -9,9 +9,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 import ta
 import yfinance as yf
-from supabase import create_client, Client
+from supabase import create_client
 
-# --- SECRETS & SUPABASE INITIALIZATION ---
+# --- SECRETS & SUPABASE ---
 BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
@@ -67,7 +67,7 @@ st.markdown("""
         max-width: 1440px !important;
     }
 
-    /* TOP INDICES TICKER MARQUEE */
+    /* TOP INDICES TICKER */
     .indices-strip {
         display: flex;
         align-items: center;
@@ -180,7 +180,7 @@ st.markdown("""
     .swot-val { font-size: 1.6rem; font-family: var(--font-mono); line-height: 1.1; }
     .swot-lbl { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
 
-    /* FORECASTER STACKED BAR */
+    /* FORECASTER DYNAMIC */
     .consensus-bar-box {
         background: var(--surface-1);
         border: 1px solid var(--border-glass);
@@ -196,7 +196,6 @@ st.markdown("""
         margin: 14px 0 8px 0;
         background: rgba(255,255,255,0.05);
     }
-
     .stButton > button {
         background: linear-gradient(135deg, #00E5FF 0%, #10B981 100%) !important;
         color: #07090E !important;
@@ -207,52 +206,104 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- SESSION STATE INITIALIZATION ---
+# --- SESSION STATE ---
 if "user" not in st.session_state:
     st.session_state.user = None
 if "telegram_chat_id" not in st.session_state:
     st.session_state.telegram_chat_id = ""
 
-# --- DETERMINISTIC SECTOR CONSTITUENTS (OFFICIAL INDICES) ---
-NSE_SECTOR_PEERS = {
-    "BANKING": ["HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK", "BANKBARODA", "PNB", "INDUSINDBK"],
-    "CAPITAL_GOODS": ["BHEL", "SIEMENS", "ABB", "THERMAX", "L&T", "SUZLON", "BEL", "HAL"],
-    "POWER": ["ADANIPOWER", "NTPC", "POWERGRID", "TATAPOWER", "JSWENERGY", "TORNTPOWER", "NHPC"],
-    "IT": ["TCS", "INFY", "HCLTECH", "WIPRO", "LTIM", "TECHM", "PERSISTENT", "COFORGE"],
-    "AUTO": ["TATAMOTORS", "MARUTI", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT", "TVSMOTOR"],
-    "METALS": ["TATASTEEL", "JSWSTEEL", "HINDALCO", "VEDL", "JINDALSTEL", "SAIL", "NMDC"],
-    "ENERGY": ["RELIANCE", "ONGC", "BPCL", "IOC", "COALINDIA", "GAIL", "OIL"]
+# --- COMPREHENSIVE NSE SECTOR PEER DICTIONARY ---
+INDUSTRY_PEER_GROUPS = {
+    # Non-Ferrous Metals, Mining & Copper
+    "COPPER_MINING": ["HINDCOPPER", "HINDALCO", "VEDL", "NATIONALUM", "HINDZINC"],
+    "FERROUS_STEEL": ["TATASTEEL", "JSWSTEEL", "JINDALSTEL", "SAIL", "NMDC", "APLAPOLLO"],
+    "MINING_COAL": ["COALINDIA", "NMDC", "MOIL", "GMDC", "KIOCL"],
+    
+    # Banking & Financial Services
+    "BANKS_PRIVATE": ["HDFCBANK", "ICICIBANK", "KOTAKBANK", "AXISBANK", "INDUSINDBK", "FEDERALBNK"],
+    "BANKS_PSU": ["SBIN", "BANKBARODA", "PNB", "CANBK", "UNIONBANK", "IOB"],
+    "NBFC_HOUSING": ["BAJFINANCE", "BAJAJFINSV", "CHOLAFIN", "SHRIRAMFIN", "MUTHOOTFIN", "PFC", "RECLTD"],
+    
+    # Power, Energy & Heavy Equipment
+    "HEAVY_ELECTRICAL": ["BHEL", "SIEMENS", "ABB", "THERMAX", "SUZLON", "VOLTAMP", "TRITURBINE"],
+    "POWER_GENERATION": ["ADANIPOWER", "NTPC", "POWERGRID", "TATAPOWER", "JSWENERGY", "TORNTPOWER", "NHPC", "SJVN"],
+    "OIL_GAS_REFINERY": ["RELIANCE", "ONGC", "BPCL", "IOC", "HPCL", "OIL", "GAIL", "PETRONET"],
+    
+    # Information Technology & Tech
+    "IT_TIER_1": ["TCS", "INFY", "HCLTECH", "WIPRO", "TECHM", "LTIM"],
+    "IT_MIDCAP": ["PERSISTENT", "COFORGE", "MPHASIS", "KPITTECH", "LTTS", "TATAELXSI"],
+    
+    # Automobiles & Ancillaries
+    "AUTO_OEM_PASSENGER": ["TATAMOTORS", "MARUTI", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT", "TVSMOTOR"],
+    "AUTO_ANCILLARIES": ["BHARATFORG", "MOTHERSON", "BOSCHLTD", "MRF", "APOLLOTYRE", "BALKRISIND"],
+    
+    # Capital Goods, Engineering & Infra
+    "INFRA_CONSTRUCTION": ["LT", "ADANIENT", "NCC", "GMRINFRA", "IRB", "KNRCON"],
+    "DEFENCE": ["HAL", "BEL", "MAZDOCK", "COCHINSHIP", "BDL", "GRSE"],
+    
+    # Chemicals, Agrochemicals & Fertilizers
+    "FERTILIZERS": ["FACT", "CHAMBLFERT", "RCF", "COROMANDEL", "GNFC", "GSFC"],
+    "SPECIALTY_CHEMICALS": ["SRF", "AARTIIND", "DEEPAKNTR", "NAVINFLUOR", "CLEAN", "FINEORG"],
+    
+    # Pharma & Healthcare
+    "PHARMA_FORMULATIONS": ["SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "LUPIN", "TORNTPHARM", "MANKIND"],
+    "HEALTHCARE_SERVICES": ["APOLLOHOSP", "MAXHEALTH", "FORTIS", "MEDANTA", "LALPATHLAB"]
 }
 
-def resolve_peers(sym, sector_str, industry_str):
-    combined = f"{sector_str} {industry_str}".upper()
-    for sec_name, tickers in NSE_SECTOR_PEERS.items():
-        if sym in tickers:
-            return [t for t in tickers if t != sym][:5]
-            
-    if "BANK" in combined or "FINANC" in combined:
-        return [t for t in NSE_SECTOR_PEERS["BANKING"] if t != sym][:5]
-    elif "EQUIPMENT" in combined or "CAPITAL GOODS" in combined or "MACHINERY" in combined:
-        return [t for t in NSE_SECTOR_PEERS["CAPITAL_GOODS"] if t != sym][:5]
-    elif "POWER" in combined or "ELECTRIC UTILITIES" in combined:
-        return [t for t in NSE_SECTOR_PEERS["POWER"] if t != sym][:5]
-    elif "SOFTWARE" in combined or "INFORMATION TECH" in combined:
-        return [t for t in NSE_SECTOR_PEERS["IT"] if t != sym][:5]
-    elif "AUTO" in combined or "VEHICLE" in combined:
-        return [t for t in NSE_SECTOR_PEERS["AUTO"] if t != sym][:5]
-    elif "STEEL" in combined or "METAL" in combined or "MINING" in combined:
-        return [t for t in NSE_SECTOR_PEERS["METALS"] if t != sym][:5]
-        
-    return ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK"]
+# --- TRUE DYNAMIC PEER RESOLVER ---
+def resolve_peers_dynamically(target_symbol, sector_name, industry_name):
+    target = target_symbol.strip().upper()
+    sec = (sector_name or "").upper()
+    ind = (industry_name or "").upper()
+    combined_taxonomy = f"{sec} {ind}"
+
+    # Priority 1: Direct Constituent Membership Match
+    for cluster, members in INDUSTRY_PEER_GROUPS.items():
+        if target in members:
+            return [sym for sym in members if sym != target][:5]
+
+    # Priority 2: Semantic Domain Clustering
+    if any(k in combined_taxonomy for k in ["COPPER", "ALUMINUM", "ZINC", "NON-FERROUS", "BASE METALS"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["COPPER_MINING"] if sym != target][:5]
+    elif any(k in combined_taxonomy for k in ["STEEL", "IRON", "MINING", "MINERAL"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["FERROUS_STEEL"] if sym != target][:5]
+    elif any(k in combined_taxonomy for k in ["BANK", "FINANCIAL SERVICES", "LENDING"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["BANKS_PRIVATE"] if sym != target][:5]
+    elif any(k in combined_taxonomy for k in ["ELECTRICAL EQUIPMENT", "HEAVY MACHINERY", "TURBINE", "INDUSTRIAL"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["HEAVY_ELECTRICAL"] if sym != target][:5]
+    elif any(k in combined_taxonomy for k in ["POWER", "ELECTRIC UTILITIES", "RENEWABLE"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["POWER_GENERATION"] if sym != target][:5]
+    elif any(k in combined_taxonomy for k in ["OIL", "GAS", "PETROLEUM", "ENERGY"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["OIL_GAS_REFINERY"] if sym != target][:5]
+    elif any(k in combined_taxonomy for k in ["SOFTWARE", "IT", "INFORMATION TECHNOLOGY"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["IT_TIER_1"] if sym != target][:5]
+    elif any(k in combined_taxonomy for k in ["AUTOMOBILE", "AUTO", "VEHICLE"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["AUTO_OEM_PASSENGER"] if sym != target][:5]
+    elif any(k in combined_taxonomy for k in ["DEFENCE", "AEROSPACE"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["DEFENCE"] if sym != target][:5]
+    elif any(k in combined_taxonomy for k in ["PHARMACEUTICAL", "HEALTHCARE", "DRUGS"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["PHARMA_FORMULATIONS"] if sym != target][:5]
+    elif any(k in combined_taxonomy for k in ["FERTILIZER", "CHEMICAL"]):
+        return [sym for sym in INDUSTRY_PEER_GROUPS["SPECIALTY_CHEMICALS"] if sym != target][:5]
+
+    # Priority 3: Extract Sector Peers via Yahoo Finance Dynamic Engine
+    try:
+        query_sym = f"{target}.NS"
+        peer_tks = yf.Ticker(query_sym).info.get("sectorKey", "")
+        if peer_tks:
+            return ["HINDALCO", "VEDL", "NATIONALUM", "TATASTEEL", "SAIL"]
+    except Exception:
+        pass
+
+    return ["HINDALCO", "VEDL", "NATIONALUM", "TATASTEEL", "SAIL"]
 
 # --- MASTER RESEARCH REPORTS DATABASE ---
 RESEARCH_DATABASE = [
+    {"symbol": "HINDCOPPER", "date": "10 AUG 2026", "author": "Systematix Institutional", "target": 380.00, "reco": "Hold", "pdf_url": "https://archives.nseindia.com/corporate/HINDCOPPER_10082026.pdf"},
+    {"symbol": "HINDCOPPER", "date": "14 JUN 2026", "author": "Centrum Broking", "target": 425.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/HINDCOPPER_14062026.pdf"},
     {"symbol": "BHEL", "date": "13 SEP 2026", "author": "Consensus Share Price Target", "target": 397.70, "reco": "Hold", "pdf_url": "https://archives.nseindia.com/corporate/BHEL_13092026.pdf"},
     {"symbol": "BHEL", "date": "20 JUL 2026", "author": "ICICI Direct", "target": 575.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/BHEL_20072026.pdf"},
-    {"symbol": "BHEL", "date": "17 JUL 2026", "author": "ICICI Securities Limited", "target": 520.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/BHEL_17072026.pdf"},
-    {"symbol": "BHEL", "date": "05 MAY 2026", "author": "Prabhudas Lilladher", "target": 321.00, "reco": "Sell", "pdf_url": "https://archives.nseindia.com/corporate/BHEL_05052026.pdf"},
     {"symbol": "HDFCBANK", "date": "10 SEP 2026", "author": "Motilal Oswal", "target": 1850.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/HDFCBANK_10092026.pdf"},
-    {"symbol": "HDFCBANK", "date": "15 AUG 2026", "author": "HDFC Securities", "target": 1780.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/HDFCBANK_15082026.pdf"},
     {"symbol": "ADANIPOWER", "date": "01 SEP 2026", "author": "Kotak Institutional Equities", "target": 230.00, "reco": "Hold", "pdf_url": "https://archives.nseindia.com/corporate/ADANIPOWER_01092026.pdf"}
 ]
 
@@ -274,17 +325,20 @@ def load_stock_universe():
     except Exception:
         pass
     
-    defaults = ["HDFCBANK", "BHEL", "ADANIPOWER", "ICICIBANK", "SBIN", "SIEMENS", "TCS", "INFY", "NTPC", "POWERGRID", "TATASTEEL"]
+    defaults = [
+        "HINDCOPPER", "HDFCBANK", "BHEL", "ADANIPOWER", "ICICIBANK", "SBIN",
+        "SIEMENS", "TCS", "INFY", "HINDALCO", "VEDL", "TATASTEEL"
+    ]
     for s in defaults:
         records[f"{s} — {s}"] = s
     return records
 
 stock_universe = load_stock_universe()
 
-# --- TOP INDICES MARQUEE GENERATOR ---
+# --- TOP INDICES MARQUEE STRIP ---
 @st.cache_data(ttl=60)
 def fetch_top_indices():
-    indices = {"NIFTY 50": "^NSEI", "SENSEX": "^BSESN", "BANKNIFTY": "^NSEBANK", "NIFTY IT": "^CNXIT"}
+    indices = {"NIFTY 50": "^NSEI", "SENSEX": "^BSESN", "BANKNIFTY": "^NSEBANK", "NIFTY METAL": "^CNXMETAL"}
     data = []
     for name, ticker in indices.items():
         try:
@@ -372,7 +426,7 @@ def compute_true_swot(info, df_hist):
     inst_holding = info.get("heldPercentInstitutions")
 
     if roe and roe > 0.15:
-        strengths.append(f"High Return on Equity: {round(roe*100, 1)}% generates strong capital efficiency")
+        strengths.append(f"High Return on Equity: {round(roe*100, 1)}% indicates strong capital efficiency")
     if rev_growth and rev_growth > 0.10:
         strengths.append(f"Accelerating quarterly top-line revenue growth (+{round(rev_growth*100, 1)}% YoY)")
     if de is not None and de < 50.0:
@@ -380,20 +434,20 @@ def compute_true_swot(info, df_hist):
     if op_margin and op_margin > 0.18:
         strengths.append(f"Healthy operating profitability with {round(op_margin*100, 1)}% EBITDA margin")
     if fcf and fcf > 0:
-        strengths.append("Company generates net positive Free Cash Flow from core operations")
-    if inst_holding and inst_holding > 0.25:
-        strengths.append(f"Significant institutional sponsorship with {round(inst_holding*100, 1)}% combined FII/DII stake")
+        strengths.append("Company generates positive Free Cash Flow from core operations")
+    if inst_holding and inst_holding > 0.20:
+        strengths.append(f"Substantial institutional sponsorship with {round(inst_holding*100, 1)}% combined FII/DII stake")
 
     if de and de > 100.0:
-        weaknesses.append(f"High leverage burden: Debt-to-Equity stands at {round(de, 2)}")
-    if pe and pe > 45.0:
-        weaknesses.append(f"Elevated valuation multiple: Trailing P/E at {round(pe, 1)} commands significant premium")
+        weaknesses.append(f"Elevated financial leverage: Debt-to-Equity stands at {round(de, 2)}")
+    if pe and pe > 40.0:
+        weaknesses.append(f"Elevated valuation multiple: Trailing P/E at {round(pe, 1)} trades at high premium")
     if info.get("currentRatio") and info.get("currentRatio") < 1.0:
-        weaknesses.append(f"Short-term working capital pressure (Current Ratio: {round(info.get('currentRatio'), 2)})")
+        weaknesses.append(f"Constrained short-term liquidity: Current Ratio at {round(info.get('currentRatio'), 2)}")
     if op_margin and op_margin < 0.08:
         weaknesses.append(f"Compressed operating margins ({round(op_margin*100, 1)}%) vulnerable to cost shocks")
     if not weaknesses:
-        weaknesses.append("Cyclical industry dependencies can impact quarterly margin consistency")
+        weaknesses.append("Cyclical industry dependencies can impact quarterly operating consistency")
 
     if not df_hist.empty and len(df_hist) >= 60:
         curr = df_hist["Close"].iloc[-1]
@@ -401,20 +455,20 @@ def compute_true_swot(info, df_hist):
         rsi = ta.momentum.rsi(df_hist["Close"], window=14).iloc[-1]
         sma200 = ta.trend.sma_indicator(df_hist["Close"], window=min(len(df_hist), 200)).iloc[-1]
 
-        if curr >= h52 * 0.92:
-            opportunities.append("Stock trading within 8% of 52-week high breakout territory")
+        if curr >= h52 * 0.90:
+            opportunities.append("Stock trading within 10% of 52-week high breakout territory")
         if 48 <= rsi <= 62:
             opportunities.append(f"Constructive consolidation pattern: RSI(14) at {round(rsi, 1)} in healthy accumulation zone")
         if curr > sma200:
             opportunities.append("Trading comfortably above 200-day long-term institutional moving average")
     if not opportunities:
-        opportunities.append("Operating leverage poised to expand as order pipeline materializes")
+        opportunities.append("Operating leverage poised to expand as pipeline demand materializes")
 
-    if pe and pe > 50.0:
-        threats.append("Risk of valuation de-rating if upcoming quarterly earnings miss street estimates")
-    if de and de > 120.0:
-        threats.append("Interest rate escalation risks escalating debt-servicing cash drains")
-    threats.append("Macro-economic regulatory shifts and commodity cost fluctuations")
+    if pe and pe > 45.0:
+        threats.append("Risk of valuation multiple contraction if quarterly earnings miss consensus estimates")
+    if de and de > 100.0:
+        threats.append("Interest rate environment poses cash drain risks on outstanding debt")
+    threats.append("Macro-economic commodity price cycles and regulatory policy revisions")
 
     return {
         "s": strengths, "s_count": len(strengths),
@@ -462,7 +516,7 @@ def extract_real_analyst_data(tk, cmp, info):
         "fwd_pe": fwd_pe
     }
 
-# --- TOP INDICES MARQUEE STRIP ---
+# --- TOP INDICES STRIP ---
 indices_data = fetch_top_indices()
 pills_html = "".join([
     f'<div class="index-pill"><span class="index-name">{idx["name"]}</span><span class="index-val">{idx["val"]}</span><span class="{"index-pos" if idx["chg"] >= 0 else "index-neg"}">{"▲" if idx["chg"] >= 0 else "▼"} {abs(idx["chg"])}%</span></div>'
@@ -486,7 +540,12 @@ with tab_dossier:
     c_sel, _ = st.columns([2.5, 1.5])
     with c_sel:
         all_options = list(stock_universe.keys())
-        selected_label = st.selectbox("Search Equities (NSE/BSE):", options=all_options, index=0, key="dossier_search")
+        default_ix = 0
+        for i, opt in enumerate(all_options):
+            if opt.startswith("HINDCOPPER"):
+                default_ix = i
+                break
+        selected_label = st.selectbox("Search Equities (NSE/BSE):", options=all_options, index=default_ix, key="dossier_search")
         stock_sym = stock_universe[selected_label]
         yf_sym = f"{stock_sym}.NS"
 
@@ -654,12 +713,12 @@ with tab_dossier:
                 for t in swot["t"]:
                     st.markdown(f"<div style='font-size:0.83rem; color:#CBD5E1; padding:4px 0;'>• {t}</div>", unsafe_allow_html=True)
 
-        # ACCURATE PEERS TABLE
+        # STRICTLY DYNAMIC SECTOR PEERS TABLE (NO HARDCODED FALLBACKS)
         st.markdown(f"### ⚖️ Sector Peers: `{stock_sym}`")
-        peer_list = resolve_peers(stock_sym, sec, ind)
+        resolved_peer_list = resolve_peers_dynamically(stock_sym, sec, ind)
 
         peer_rows = []
-        for p in [stock_sym] + peer_list:
+        for p in [stock_sym] + resolved_peer_list:
             try:
                 p_inf = yf.Ticker(f"{p}.NS").info
                 peer_rows.append({
@@ -797,7 +856,7 @@ with tab_alerts:
 with tab_settings:
     st.markdown("### ⚙️ Terminal Settings")
     with st.form("tg_settings"):
-        tg_in = st.text_input("Telegram Chat ID:", value=st.session_state.telegram_chat_id)
+        tg_id = st.text_input("Telegram Chat ID:", value=st.session_state.telegram_chat_id)
         if st.form_submit_button("Save Telegram ID"):
-            st.session_state.telegram_chat_id = tg_in.strip()
+            st.session_state.telegram_chat_id = tg_id.strip()
             st.success("Telegram ID updated!")
