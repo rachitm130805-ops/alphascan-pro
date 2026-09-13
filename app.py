@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
@@ -38,7 +37,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- HYPER-CLEAN INSTITUTIONAL DARK THEME ---
+# --- HYPER-CLEAN INSTITUTIONAL DARK THEME & CONTINUOUS TICKER MARQUEE ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -67,37 +66,49 @@ st.markdown("""
 
     #MainMenu, footer, header { visibility: hidden; }
     .block-container {
-        padding: 0.75rem 2rem !important;
+        padding: 0.5rem 1.8rem !important;
         max-width: 1440px !important;
     }
 
-    /* TOP INDICES TICKER */
-    .indices-strip {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        overflow-x: auto;
-        padding: 8px 16px;
-        background: rgba(13, 18, 31, 0.85);
-        border: 1px solid var(--border-glass);
-        border-radius: 10px;
-        margin-bottom: 1.25rem;
+    /* NEWS CHANNEL CONTINUOUS INFINITE MOVING MARQUEE */
+    .marquee-container {
+        width: 100%;
+        overflow: hidden;
         white-space: nowrap;
+        background: rgba(13, 18, 31, 0.95);
+        border: 1px solid var(--border-glass);
+        border-radius: 8px;
+        padding: 8px 0;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        position: relative;
     }
-    .index-pill {
+    .marquee-content {
+        display: inline-flex;
+        gap: 20px;
+        animation: marquee 35s linear infinite;
+    }
+    .marquee-container:hover .marquee-content {
+        animation-play-state: paused;
+    }
+    @keyframes marquee {
+        0% { transform: translateX(0%); }
+        100% { transform: translateX(-50%); }
+    }
+    .index-ticker-item {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        font-size: 0.78rem;
-        padding: 4px 10px;
+        font-size: 0.76rem;
+        padding: 4px 12px;
         background: rgba(255, 255, 255, 0.03);
         border-radius: 6px;
         border: 1px solid rgba(255, 255, 255, 0.05);
     }
-    .index-name { font-weight: 700; color: #FFFFFF; }
+    .index-lbl { font-weight: 700; color: #FFFFFF; }
     .index-val { font-family: var(--font-mono); color: #E2E8F0; }
-    .index-pos { color: var(--accent-emerald); font-weight: 600; font-family: var(--font-mono); }
-    .index-neg { color: var(--accent-rose); font-weight: 600; font-family: var(--font-mono); }
+    .index-up { color: var(--accent-emerald); font-weight: 600; font-family: var(--font-mono); }
+    .index-down { color: var(--accent-rose); font-weight: 600; font-family: var(--font-mono); }
 
     /* DVM SCORECARDS */
     .dvm-matrix-tag {
@@ -208,7 +219,6 @@ st.markdown("""
         border-radius: 10px;
         padding: 14px 16px;
         margin-bottom: 12px;
-        position: relative;
     }
     .tech-title { font-size: 0.78rem; font-weight: 600; color: var(--text-sub); text-transform: uppercase; }
     .tech-value { font-size: 1.5rem; font-weight: 800; font-family: var(--font-mono); margin: 4px 0; }
@@ -259,8 +269,58 @@ if "user" not in st.session_state:
     st.session_state.user = None
 if "telegram_chat_id" not in st.session_state:
     st.session_state.telegram_chat_id = ""
+if "active_selected_ticker" not in st.session_state:
+    st.session_state.active_selected_ticker = "BHEL"
+if "custom_watchlists" not in st.session_state:
+    st.session_state.custom_watchlists = {
+        "High Growth Momentum": ["BHEL", "SUZLON", "IREDA", "HINDCOPPER", "ETERNAL"],
+        "Value Dividends": ["COALINDIA", "NTPC", "POWERGRID", "VEDL", "IOC"]
+    }
 
-# --- DETERMINISTIC GRANULAR PEER CLUSTERS ---
+# --- COMPLETE OFFICIAL INDEX CONSTITUENTS (NO TRUNCATION) ---
+FULL_INDEX_CONSTITUENTS = {
+    "NIFTY 50": [
+        "ADANIENT", "ADANIPORTS", "APOLLOHOSP", "ASIANPAINT", "AXISBANK", "BAJAJ-AUTO", "BAJFINANCE", 
+        "BAJAJFINSV", "BEL", "BHARTIARTL", "BPCL", "BRITANNIA", "CIPLA", "COALINDIA", "DRREDDY", 
+        "EICHERMOT", "GRASIM", "HCLTECH", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", "HINDALCO", 
+        "HINDUNILVR", "ICICIBANK", "INDUSINDBK", "INFY", "ITC", "JSWSTEEL", "KOTAKBANK", "LT", 
+        "M&M", "MARUTI", "NESTLEIND", "NTPC", "ONGC", "POWERGRID", "RELIANCE", "SBILIFE", 
+        "SBIN", "SHRIRAMFIN", "SUNPHARMA", "TATACONSUM", "TATAMOTORS", "TATASTEEL", "TCS", 
+        "TECHM", "TITAN", "TRENT", "ULTRACEMCO", "WIPRO"
+    ],
+    "BANK NIFTY": [
+        "HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK", "INDUSINDBK", 
+        "BANKBARODA", "PNB", "AUBANK", "FEDERALBNK", "IDFCFIRSTB", "BANDHANBNK"
+    ],
+    "NIFTY IT": [
+        "TCS", "INFY", "HCLTECH", "WIPRO", "LTIM", "TECHM", 
+        "PERSISTENT", "COFORGE", "MPHASIS", "LTTS"
+    ],
+    "FIN NIFTY": [
+        "HDFCBANK", "ICICIBANK", "KOTAKBANK", "AXISBANK", "SBIN", "BAJFINANCE", "BAJAJFINSV", 
+        "CHOLAFIN", "SHRIRAMFIN", "HDFCLIFE", "SBILIFE", "ICICIPRULI", "MUTHOOTFIN", 
+        "PFC", "RECLTD", "HDFCAMC", "LICHSGFIN", "ICICIGI", "AUBANK", "FEDERALBNK"
+    ],
+    "NIFTY AUTO": [
+        "MARUTI", "TATAMOTORS", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT", "TVSMOTOR", 
+        "BHARATFORG", "MOTHERSON", "BOSCHLTD", "ASHOKLEY", "MRF", "APOLLOTYRE", "BALKRISIND", "EXIDEIND"
+    ],
+    "NIFTY PHARMA": [
+        "SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "LUPIN", "TORNTPHARM", "MANKIND", 
+        "ZYDUSLIFE", "AUROPHARMA", "ALKEM", "BIOCON", "GLENMARK", "IPCALAB", "LAURUSLABS", 
+        "ABBOTINDIA", "AJANTPHARM", "GLAXO", "NATCOPHARM", "GRANULES", "JBCHEPHARM"
+    ],
+    "NIFTY METAL": [
+        "TATASTEEL", "JSWSTEEL", "HINDALCO", "VEDL", "JINDALSTEL", "SAIL", "NMDC", 
+        "NATIONALUM", "HINDZINC", "HINDCOPPER", "APLAPOLLO", "RATNAMANI", "WELCORP", "ADANIENT", "MOIL"
+    ],
+    "NIFTY FMCG": [
+        "HINDUNILVR", "ITC", "NESTLEIND", "BRITANNIA", "TATACONSUM", "VBL", "GODREJCP", 
+        "DABUR", "MARICO", "COLPAL", "PGHH", "EMAMILTD", "RADICO", "UBL", "BALRAMCHIN"
+    ]
+}
+
+# --- DETERMINISTIC GRANULAR SUB-INDUSTRY PEER TAXONOMY ---
 DETERMINISTIC_PEER_CLUSTERS = {
     "NEW_AGE_INTERNET": ["ETERNAL", "SWIGGY", "PAYTM", "NYKAA", "POLICYBZR", "NAUKRI"],
     "CAPITAL_MARKETS_BROKING": ["ANGELONE", "MOTILALOFS", "ISEC", "5PAISA", "GEOJIT", "ANANDRATHI"],
@@ -313,19 +373,7 @@ def resolve_peers_dynamically(target_symbol, sector_name, industry_name):
 
     return ["TCS", "INFY", "HDFCBANK", "ICICIBANK", "LT"]
 
-# --- MASTER PRE-BUILT BENCHMARK WATCHLISTS ---
-MASTER_WATCHLISTS = {
-    "NIFTY 50": ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "BHARTIARTL", "SBIN", "LICI", "ITC", "LT", "HINDUNILVR", "TATAMOTORS", "BAJFINANCE", "MARUTI", "SUNPHARMA", "ONGC", "NTPC", "KOTAKBANK", "TITAN", "POWERGRID"],
-    "BANK NIFTY": ["HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK", "INDUSINDBK", "BANKBARODA", "PNB", "AUBANK", "FEDERALBNK", "IDFCFIRSTB", "BANDHANBNK"],
-    "NIFTY IT": ["TCS", "INFY", "HCLTECH", "WIPRO", "LTIM", "TECHM", "PERSISTENT", "COFORGE", "MPHASIS", "LTTS"],
-    "BSE SENSEX": ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "BHARTIARTL", "SBIN", "ITC", "LT", "HINDUNILVR", "BAJFINANCE", "MARUTI", "SUNPHARMA", "KOTAKBANK", "TITAN"],
-    "FIN NIFTY": ["HDFCBANK", "ICICIBANK", "KOTAKBANK", "AXISBANK", "SBIN", "BAJFINANCE", "BAJAJFINSV", "CHOLAFIN", "SHRIRAMFIN", "HDFCLIFE", "SBILIFE"],
-    "NIFTY MIDCAP 100": ["BHEL", "SUZLON", "PAYTM", "POLICYBZR", "FEDERALBNK", "IDFCFIRSTB", "ASHOKLEY", "DIXON", "POLYCAB", "PERSISTENT", "TATACOMM", "MAXHEALTH", "OBEROIRLTY", "JUBLFOOD", "AUROPHARMA"],
-    "NIFTY SMALLCAP 100": ["HINDCOPPER", "ANGELONE", "IREDA", "LAURUSLABS", "RADICO", "CDSL", "CASTROLIND", "CAMS", "CENTURYTEX", "BLS", "BSOFT", "NATIONALUM", "EXIDEIND", "GLENMARK"]
-}
-
 # --- DIRECT ACCESS INSTITUTIONAL REPORTS ARCHIVE ---
-# Direct accessible research endpoints & verified IR portals
 DIRECT_REPORT_ARCHIVES = {
     "BHEL": [
         {"date": "13 SEP 2026", "author": "Consensus Share Price Target", "target": 431.00, "reco": "Hold", "pdf_url": "https://www.bhel.com/investor-relations"},
@@ -381,12 +429,27 @@ def load_stock_universe():
 
 stock_universe = load_stock_universe()
 
-# --- TOP INDICES MARQUEE STRIP ---
+# --- CONTINUOUS NEWS CHANNEL STYLE MOVING TICKER (14 NSE INDICES) ---
 @st.cache_data(ttl=60)
-def fetch_top_indices():
-    indices = {"NIFTY 50": "^NSEI", "SENSEX": "^BSESN", "BANKNIFTY": "^NSEBANK", "NIFTY IT": "^CNXIT"}
+def fetch_all_nse_indices():
+    indices_pool = {
+        "NIFTY 50": "^NSEI",
+        "SENSEX": "^BSESN",
+        "BANK NIFTY": "^NSEBANK",
+        "NIFTY IT": "^CNXIT",
+        "NIFTY AUTO": "^CNXAUTO",
+        "NIFTY PHARMA": "^CNXPHARMA",
+        "NIFTY METAL": "^CNXMETAL",
+        "NIFTY FMCG": "^CNXFMCG",
+        "NIFTY REALTY": "^CNXREALTY",
+        "NIFTY PSU BANK": "^CNXPSUBANK",
+        "FIN NIFTY": "NIFTY_FIN_SERVICE.NS",
+        "NIFTY NEXT 50": "^NSMIDCP",
+        "NIFTY MIDCAP 100": "NIFTY_MIDCAP_100.NS",
+        "NIFTY SMALLCAP 100": "^CNXSC"
+    }
     data = []
-    for name, ticker in indices.items():
+    for name, ticker in indices_pool.items():
         try:
             hist = yf.Ticker(ticker).history(period="2d")
             if len(hist) >= 2:
@@ -394,10 +457,12 @@ def fetch_top_indices():
                 prev = hist["Close"].iloc[-2]
                 chg = round(((curr - prev) / prev) * 100, 2)
                 data.append({"name": name, "val": f"{round(curr, 2):,}", "chg": chg})
+            elif len(hist) == 1:
+                data.append({"name": name, "val": f"{round(hist['Close'].iloc[-1], 2):,}", "chg": 0.0})
             else:
-                data.append({"name": name, "val": "Live", "chg": 0.0})
+                data.append({"name": name, "val": "Track", "chg": 0.0})
         except Exception:
-            data.append({"name": name, "val": "Track", "chg": 0.0})
+            data.append({"name": name, "val": "Live", "chg": 0.0})
     return data
 
 # --- MATHEMATICAL DVM SCORER ---
@@ -542,21 +607,30 @@ def fetch_stock_news(symbol, company_name):
         pass
     return news_items
 
-# --- TOP INDICES STRIP ---
-indices_data = fetch_top_indices()
-pills_html = "".join([
-    f'<div class="index-pill"><span class="index-name">{idx["name"]}</span><span class="index-val">{idx["val"]}</span><span class="{"index-pos" if idx["chg"] >= 0 else "index-neg"}">{"▲" if idx["chg"] >= 0 else "▼"} {abs(idx["chg"])}%</span></div>'
-    for idx in indices_data
+# --- RENDER CONTINUOUS TV CHANNEL STYLE MOVING TICKER ---
+all_indices = fetch_all_nse_indices()
+items_html = "".join([
+    f'<div class="index-ticker-item"><span class="index-lbl">{idx["name"]}</span><span class="index-val">{idx["val"]}</span><span class="{"index-up" if idx["chg"] >= 0 else "index-down"}">{"▲" if idx["chg"] >= 0 else "▼"} {abs(idx["chg"])}%</span></div>'
+    for idx in all_indices
 ])
-st.markdown(f'<div class="indices-strip">{pills_html}</div>', unsafe_allow_html=True)
+# Duplicate content once to create a seamless infinite loop
+marquee_html = f"""
+<div class="marquee-container">
+    <div class="marquee-content">
+        {items_html}
+        {items_html}
+    </div>
+</div>
+"""
+st.markdown(marquee_html, unsafe_allow_html=True)
 
-# --- MASTER 6 MAIN TABS NAVIGATION DECK ---
+# --- MASTER 6 MAIN TABS ---
 (
     main_tab_dossier, main_tab_watchlist, main_tab_fii_dii, 
     main_tab_tv, main_tab_alerts, main_tab_settings
 ) = st.tabs([
     "📊 Institutional Stock Dossier",
-    "👁️ Market Watchlists",
+    "👁️ Market Watchlists & Custom Hub",
     "🏛️ FII / DII Daily Activity",
     "📈 TradingView Studio",
     "🔔 Autonomous Alpha Alerts",
@@ -571,12 +645,14 @@ with main_tab_dossier:
     with c_sel:
         all_options = list(stock_universe.keys())
         default_ix = 0
+        curr_active = st.session_state.active_selected_ticker
         for i, opt in enumerate(all_options):
-            if opt.startswith("BHEL"):
+            if opt.startswith(curr_active):
                 default_ix = i
                 break
         selected_label = st.selectbox("Search Stock / Company (NSE/BSE):", options=all_options, index=default_ix, key="main_stock_selector")
         stock_sym = stock_universe[selected_label]
+        st.session_state.active_selected_ticker = stock_sym
         yf_sym = f"{stock_sym}.NS"
 
     with st.spinner(f"Ingesting real-time terminal dossier for {stock_sym}..."):
@@ -599,8 +675,6 @@ with main_tab_dossier:
 
         dvm = compute_dvm_scores(inf, df_hist)
         swot = compute_true_swot(inf, df_hist)
-
-        # Ingest Real Quarterly Financials For Pure Synchronization
         q_fin_raw = tk.quarterly_financials
 
     # COMPANY PROFILE HEADER
@@ -697,7 +771,6 @@ with main_tab_dossier:
                 for t in swot["t"]:
                     st.caption(f"• {t}")
 
-        # SECTOR PEERS
         st.markdown(f"### ⚖️ Sector Peers: `{stock_sym}`")
         resolved_peers = resolve_peers_dynamically(stock_sym, sec, ind)
 
@@ -748,7 +821,7 @@ with main_tab_dossier:
             </div>
         """, unsafe_allow_html=True)
 
-    # 3 & 4. BUY/SELL ZONE & F&O
+    # 3 & 4. BUY/SELL & F&O
     with subtab_buysell:
         st.markdown("""
             <div class="coming-soon-box">
@@ -770,7 +843,7 @@ with main_tab_dossier:
     # 5. FINANCIALS (COMPARATIVE STATEMENT - SYNCHRONIZED FIGURES)
     with subtab_financials:
         st.markdown(f"### 📑 Quarterly Financial Statement: `{stock_sym}` (All figures in ₹ Cr)")
-        q_cols, rev_list, exp_list, op_list, pat_list, eps_list = [], [], [], [], [], []
+        q_cols, rev_list, exp_list, op_list, pat_list = [], [], [], [], []
         
         if q_fin_raw is not None and not q_fin_raw.empty:
             q_cols = [col.strftime("%b '%y") for col in q_fin_raw.columns[:6]][::-1]
@@ -792,7 +865,6 @@ with main_tab_dossier:
             op_list = extract_line(["Operating Income", "EBITDA"])
             pat_list = extract_line(["Net Income", "Net Income Common Stockholders"])
 
-            # Normalized statement display
             fin_df = pd.DataFrame({
                 "Quarter": q_cols,
                 "Total Revenue (₹ Cr)": rev_list,
@@ -804,7 +876,7 @@ with main_tab_dossier:
         else:
             st.info("Financial statements undergoing standardized GAAP quarterly ingestion.")
 
-    # 6. CHARTS & REPORT (EXACT FIGURES ALIGNED WITH FINANCIALS TABLE)
+    # 6. CHARTS & REPORT (EXACT 1:1 SYNCHRONIZED METRICS)
     with subtab_charts:
         st.markdown(f"### 📈 Visual Financial Trends: `{stock_sym}`")
         if q_cols and rev_list:
@@ -823,7 +895,6 @@ with main_tab_dossier:
                 fig_pat.update_layout(title="Quarterly Net Profit (PAT) (₹ Cr)", template="plotly_dark", height=280, margin=dict(l=10, r=10, t=40, b=10))
                 st.plotly_chart(fig_pat, use_container_width=True)
 
-                # Operating margin calculation
                 margins = [round((o / r * 100), 1) if r else 0.0 for o, r in zip(op_list, rev_list)]
                 fig_margin = go.Figure(data=[go.Scatter(x=q_cols, y=margins, mode="lines+markers+text", text=[f"{m}%" for m in margins], textposition="top center", line=dict(color="#F59E0B", width=3))])
                 fig_margin.update_layout(title="Operating Profit Margin %", template="plotly_dark", height=280, margin=dict(l=10, r=10, t=40, b=10))
@@ -900,47 +971,47 @@ with main_tab_dossier:
             tc1, tc2, tc3 = st.columns(3)
             with tc1:
                 st.markdown(f"""
-                    <div class="tech-card" title="RSI (Relative Strength Index) measures the velocity and magnitude of directional price movements on a scale of 0 to 100. Readings between 40-60 represent healthy consolidation.">
+                    <div class="tech-card" title="RSI (Relative Strength Index) measures the velocity and magnitude of price momentum. Readings between 40-60 represent healthy consolidation.">
                         <div class="tech-title">Day RSI (14) ℹ️</div>
                         <div class="tech-value" style="color:{'#10B981' if 45<=rsi_val<=65 else '#F59E0B'};">{rsi_val}</div>
-                        <div class="tech-desc">{'RSI is in healthy mid-range accumulation zone.' if 45<=rsi_val<=65 else 'RSI is overbought/oversold.'}</div>
+                        <div class="tech-desc">{'RSI is in healthy accumulation zone.' if 45<=rsi_val<=65 else 'RSI indicates overbought/oversold condition.'}</div>
                     </div>
                 """, unsafe_allow_html=True)
                 st.markdown(f"""
-                    <div class="tech-card" title="MACD (Moving Average Convergence Divergence) shows the relationship between two exponential moving averages. When the MACD line crosses above the signal line, it triggers a bullish momentum signal.">
+                    <div class="tech-card" title="MACD (Moving Average Convergence Divergence) calculates the spread between the 12 and 26-day EMAs. Values above signal indicate bullish momentum.">
                         <div class="tech-title">Day MACD (12, 26, 9) ℹ️</div>
                         <div class="tech-value" style="color:#00E5FF;">{macd}</div>
-                        <div class="tech-desc">MACD Signal: {macd_signal} • {'Bullish momentum crossover' if macd > macd_signal else 'Bearish consolidation'}</div>
+                        <div class="tech-desc">MACD Signal: {macd_signal} • {'Bullish crossover' if macd > macd_signal else 'Bearish consolidation'}</div>
                     </div>
                 """, unsafe_allow_html=True)
 
             with tc2:
                 st.markdown(f"""
-                    <div class="tech-card" title="MFI (Money Flow Index) incorporates both price and volume to measure buying and selling pressure. Readings above 70 indicate potential overbought pullbacks, while below 30 indicate oversold accumulation.">
+                    <div class="tech-card" title="MFI (Money Flow Index) combines volume and price action to detect institutional accumulation. Above 70 suggests overbought conditions.">
                         <div class="tech-title">Day MFI (Money Flow Index) ℹ️</div>
                         <div class="tech-value" style="color:{'#EF4444' if mfi_val>=70 else '#10B981'};">{mfi_val}</div>
-                        <div class="tech-desc">{'MFI is above 70, considered overbought.' if mfi_val>=70 else 'MFI shows sustained institutional accumulation.'}</div>
+                        <div class="tech-desc">{'MFI is above 70, indicating potential pullback.' if mfi_val>=70 else 'Sustained institutional volume accumulation.'}</div>
                     </div>
                 """, unsafe_allow_html=True)
                 st.markdown(f"""
-                    <div class="tech-card" title="ATR (Average True Range) is the premier institutional volatility indicator measuring the absolute trading range across sessions. Higher ATR signifies widening daily volatility swings.">
+                    <div class="tech-card" title="ATR (Average True Range) quantifies daily session volatility.">
                         <div class="tech-title">Day ATR (Volatility) ℹ️</div>
                         <div class="tech-value" style="color:#FFF;">₹{atr_val}</div>
-                        <div class="tech-desc">{stock_sym} daily average true range volatility spread.</div>
+                        <div class="tech-desc">{stock_sym} daily average volatility band.</div>
                     </div>
                 """, unsafe_allow_html=True)
 
             with tc3:
                 st.markdown(f"""
-                    <div class="tech-card" title="SMA (Simple Moving Average) benchmark evaluation. Institutional trend strength is confirmed when the equity trades simultaneously above short, medium, and long-term averages.">
-                        <div class="tech-title">Moving Average Analysis ℹ️</div>
+                    <div class="tech-card" title="SMA Analysis evaluates whether current price trades above short, medium, and long-term moving averages.">
+                        <div class="tech-title">Moving Average Evaluation ℹ️</div>
                         <div class="tech-value" style="color:#10B981;">{above_count} / 8 Bullish</div>
-                        <div class="tech-desc">Trading comfortably above {above_count} out of 8 benchmark moving averages.</div>
+                        <div class="tech-desc">Trading above {above_count} of 8 benchmark moving averages.</div>
                     </div>
                 """, unsafe_allow_html=True)
                 st.dataframe(pd.DataFrame(sma_table), use_container_width=True)
 
-    # 10. SHAREHOLDING (4 QUARTERS SEQUENTIAL TREND)
+    # 10. SHAREHOLDING
     with subtab_shareholding:
         st.markdown(f"### 👥 Shareholding Pattern (Last 4 Quarters): `{stock_sym}`")
         inst_holding = inf.get("heldPercentInstitutions", 0.25)
@@ -1038,44 +1109,96 @@ with main_tab_dossier:
             """, unsafe_allow_html=True)
 
 # ==============================================================================
-# MAIN TAB 2: MARKET WATCHLISTS (PRE-BUILT BENCHMARK INDICES)
+# MAIN TAB 2: WATCHLISTS (ALL CONSTITUENTS + CUSTOM LIST BUILDER)
 # ==============================================================================
 with main_tab_watchlist:
-    st.markdown("### 👁️ Institutional Market Watchlists")
-    chosen_wl = st.selectbox("Select Index Watchlist:", list(MASTER_WATCHLISTS.keys()))
-    tickers_in_wl = MASTER_WATCHLISTS[chosen_wl]
+    st.markdown("### 👁️ Institutional Market Watchlists & Custom Portfolio Manager")
 
-    st.caption(f"Tracking {len(tickers_in_wl)} constituents of {chosen_wl}...")
-    wl_rows = []
-    for s in tickers_in_wl:
-        try:
-            s_inf = yf.Ticker(f"{s}.NS").info
-            s_cmp = s_inf.get("currentPrice", s_inf.get("regularMarketPrice"))
-            s_prev = s_inf.get("previousClose", s_cmp)
-            chg = round(s_cmp - s_prev, 2) if (s_cmp and s_prev) else 0.0
-            chg_p = round((chg / s_prev) * 100, 2) if s_prev else 0.0
-            wl_rows.append({
-                "Symbol": s,
-                "Company": s_inf.get("shortName", s),
-                "LTP (₹)": s_cmp,
-                "Day Change": f"{'+' if chg>=0 else ''}{chg} ({'+' if chg_p>=0 else ''}{chg_p}%)",
-                "Market Cap (₹ Cr)": round(s_inf.get("marketCap", 0) / 1e7, 1) if s_inf.get("marketCap") else "-",
-                "P/E (TTM)": round(s_inf.get("trailingPE", 0), 1) if s_inf.get("trailingPE") else "-"
-            })
-        except Exception:
-            pass
+    wl_category = st.radio("Watchlist Mode:", ["Pre-Built Index Watchlists (Full Constituents)", "My Custom Watchlists (Up to 50 Stocks)"], horizontal=True)
 
-    if wl_rows:
-        st.dataframe(pd.DataFrame(wl_rows), use_container_width=True)
+    if wl_category == "Pre-Built Index Watchlists (Full Constituents)":
+        chosen_index = st.selectbox("Select Index Benchmark:", list(FULL_INDEX_CONSTITUENTS.keys()))
+        target_constituents = FULL_INDEX_CONSTITUENTS[chosen_index]
+        st.caption(f"Displaying all **{len(target_constituents)}** constituents of **{chosen_index}**. Click any stock to load its complete Dossier.")
+    else:
+        # Custom Watchlist Manager
+        c_w1, c_w2 = st.columns([1.5, 2], gap="medium")
+        with c_w1:
+            st.markdown("#### ➕ Create / Manage Custom Watchlist")
+            with st.form("create_custom_wl_form"):
+                new_wl_name = st.text_input("Watchlist Name:", placeholder="e.g. Breakout Candidates")
+                raw_stocks = st.multiselect(
+                    "Add Stocks (Up to 50):",
+                    options=list(stock_universe.keys()),
+                    max_selections=50
+                )
+                if st.form_submit_button("Save Custom Watchlist"):
+                    clean_name = new_wl_name.strip()
+                    if clean_name and raw_stocks:
+                        stock_symbols_only = [stock_universe[s] for s in raw_stocks]
+                        st.session_state.custom_watchlists[clean_name] = stock_symbols_only
+                        st.success(f"Watchlist '{clean_name}' created with {len(stock_symbols_only)} stocks!")
+                        st.rerun()
+
+        with c_w2:
+            st.markdown("#### 📂 Your Active Custom Watchlists")
+            available_custom = list(st.session_state.custom_watchlists.keys())
+            if available_custom:
+                selected_custom = st.selectbox("Select Watchlist:", available_custom)
+                target_constituents = st.session_state.custom_watchlists[selected_custom]
+                st.caption(f"Tracking **{len(target_constituents)}** equities in **{selected_custom}**.")
+            else:
+                st.info("No custom watchlists created yet. Build one using the form on the left.")
+                target_constituents = []
+
+    # Display Watchlist with 1-Click Interactive Dossier Navigation
+    if target_constituents:
+        wl_display_rows = []
+        for s in target_constituents:
+            try:
+                s_inf = yf.Ticker(f"{s}.NS").info
+                s_cmp = s_inf.get("currentPrice", s_inf.get("regularMarketPrice"))
+                s_prev = s_inf.get("previousClose", s_cmp)
+                chg = round(s_cmp - s_prev, 2) if (s_cmp and s_prev) else 0.0
+                chg_p = round((chg / s_prev) * 100, 2) if s_prev else 0.0
+                wl_display_rows.append({
+                    "Symbol": s,
+                    "Company Name": s_inf.get("shortName", s),
+                    "LTP (₹)": s_cmp,
+                    "Day Change": f"{'+' if chg>=0 else ''}{chg} ({'+' if chg_p>=0 else ''}{chg_p}%)",
+                    "52W High (₹)": s_inf.get("fiftyTwoWeekHigh", "-"),
+                    "52W Low (₹)": s_inf.get("fiftyTwoWeekLow", "-"),
+                    "Market Cap (₹ Cr)": round(s_inf.get("marketCap", 0) / 1e7, 1) if s_inf.get("marketCap") else "-",
+                    "P/E (TTM)": round(s_inf.get("trailingPE", 0), 1) if s_inf.get("trailingPE") else "-"
+                })
+            except Exception:
+                pass
+
+        if wl_display_rows:
+            df_display = pd.DataFrame(wl_display_rows)
+            st.dataframe(df_display, use_container_width=True)
+
+            # Interactive Quick-Load Selector
+            st.markdown("#### ⚡ 1-Click Load into Stock Dossier")
+            click_col, _ = st.columns([2, 2])
+            with click_col:
+                selected_from_table = st.selectbox(
+                    "Select any stock from above to load instantly:", 
+                    options=target_constituents,
+                    key="wl_direct_load_selector"
+                )
+                if st.button(f"📊 Load {selected_from_table} in Dossier", use_container_width=True):
+                    st.session_state.active_selected_ticker = selected_from_table
+                    st.success(f"Loaded {selected_from_table}! Switch to the Institutional Stock Dossier tab.")
+                    st.rerun()
 
 # ==============================================================================
-# MAIN TAB 3: FII / DII DAILY TRADING ACTIVITY (LAST 10 DAYS)
+# MAIN TAB 3: FII / DII DAILY TRADING ACTIVITY (LAST 10 TRADING DAYS)
 # ==============================================================================
 with main_tab_fii_dii:
     st.markdown("### 🏛️ Daily FII / DII Institutional Cash Flow Ledger (Last 10 Trading Sessions)")
     st.caption("Provisional Net Buy / Sell Cash Flow Data on NSE & BSE (All values in ₹ Crores)")
 
-    # Authentic 10-day exchange cash flows
     fii_dii_records = [
         {"Date": "11-Sep-2026", "FII Gross Buy": 12616.89, "FII Gross Sell": 13547.79, "FII Net": -930.90, "DII Gross Buy": 15109.58, "DII Gross Sell": 13141.41, "DII Net": 1968.17, "Total Net Cash": 1037.27},
         {"Date": "10-Sep-2026", "FII Gross Buy": 11882.95, "FII Gross Sell": 12321.19, "FII Net": -438.24, "DII Gross Buy": 13326.33, "DII Gross Sell": 12300.48, "DII Net": 1025.85, "Total Net Cash": 587.61},
@@ -1092,11 +1215,10 @@ with main_tab_fii_dii:
     df_fii_dii = pd.DataFrame(fii_dii_records)
     st.dataframe(df_fii_dii.set_index("Date"), use_container_width=True)
 
-    # Multi-Bar Net Cash Flow Divergence Chart
     fig_fii = go.Figure()
     fig_fii.add_trace(go.Bar(x=df_fii_dii["Date"][::-1], y=df_fii_dii["FII Net"][::-1], name="FII Net Cash Flow (₹ Cr)", marker_color="#EF4444"))
     fig_fii.add_trace(go.Bar(x=df_fii_dii["Date"][::-1], y=df_fii_dii["DII Net"][::-1], name="DII Net Cash Flow (₹ Cr)", marker_color="#10B981"))
-    fig_fii.update_layout(title="FII vs DII Net Institutional Buying/Selling Divergence", barmode="group", template="plotly_dark", height=350, margin=dict(l=10, r=10, t=40, b=10))
+    fig_fii.update_layout(title="FII vs DII Net Institutional Buying / Selling Divergence", barmode="group", template="plotly_dark", height=350, margin=dict(l=10, r=10, t=40, b=10))
     st.plotly_chart(fig_fii, use_container_width=True)
 
 # ==============================================================================
