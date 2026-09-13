@@ -9,9 +9,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 import ta
 import yfinance as yf
-from supabase import create_client
+from supabase import create_client, Client
 
-# --- SECRETS & SUPABASE ---
+# --- SECRETS & SUPABASE INITIALIZATION ---
 BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
@@ -206,101 +206,107 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- SESSION STATE ---
+# --- SESSION STATE INITIALIZATION ---
 if "user" not in st.session_state:
     st.session_state.user = None
 if "telegram_chat_id" not in st.session_state:
     st.session_state.telegram_chat_id = ""
 
-# --- COMPREHENSIVE NSE SECTOR PEER DICTIONARY ---
-INDUSTRY_PEER_GROUPS = {
-    # Non-Ferrous Metals, Mining & Copper
-    "COPPER_MINING": ["HINDCOPPER", "HINDALCO", "VEDL", "NATIONALUM", "HINDZINC"],
-    "FERROUS_STEEL": ["TATASTEEL", "JSWSTEEL", "JINDALSTEL", "SAIL", "NMDC", "APLAPOLLO"],
-    "MINING_COAL": ["COALINDIA", "NMDC", "MOIL", "GMDC", "KIOCL"],
-    
-    # Banking & Financial Services
-    "BANKS_PRIVATE": ["HDFCBANK", "ICICIBANK", "KOTAKBANK", "AXISBANK", "INDUSINDBK", "FEDERALBNK"],
-    "BANKS_PSU": ["SBIN", "BANKBARODA", "PNB", "CANBK", "UNIONBANK", "IOB"],
-    "NBFC_HOUSING": ["BAJFINANCE", "BAJAJFINSV", "CHOLAFIN", "SHRIRAMFIN", "MUTHOOTFIN", "PFC", "RECLTD"],
-    
-    # Power, Energy & Heavy Equipment
-    "HEAVY_ELECTRICAL": ["BHEL", "SIEMENS", "ABB", "THERMAX", "SUZLON", "VOLTAMP", "TRITURBINE"],
-    "POWER_GENERATION": ["ADANIPOWER", "NTPC", "POWERGRID", "TATAPOWER", "JSWENERGY", "TORNTPOWER", "NHPC", "SJVN"],
-    "OIL_GAS_REFINERY": ["RELIANCE", "ONGC", "BPCL", "IOC", "HPCL", "OIL", "GAIL", "PETRONET"],
-    
-    # Information Technology & Tech
-    "IT_TIER_1": ["TCS", "INFY", "HCLTECH", "WIPRO", "TECHM", "LTIM"],
-    "IT_MIDCAP": ["PERSISTENT", "COFORGE", "MPHASIS", "KPITTECH", "LTTS", "TATAELXSI"],
-    
-    # Automobiles & Ancillaries
-    "AUTO_OEM_PASSENGER": ["TATAMOTORS", "MARUTI", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT", "TVSMOTOR"],
-    "AUTO_ANCILLARIES": ["BHARATFORG", "MOTHERSON", "BOSCHLTD", "MRF", "APOLLOTYRE", "BALKRISIND"],
-    
-    # Capital Goods, Engineering & Infra
-    "INFRA_CONSTRUCTION": ["LT", "ADANIENT", "NCC", "GMRINFRA", "IRB", "KNRCON"],
-    "DEFENCE": ["HAL", "BEL", "MAZDOCK", "COCHINSHIP", "BDL", "GRSE"],
-    
-    # Chemicals, Agrochemicals & Fertilizers
-    "FERTILIZERS": ["FACT", "CHAMBLFERT", "RCF", "COROMANDEL", "GNFC", "GSFC"],
-    "SPECIALTY_CHEMICALS": ["SRF", "AARTIIND", "DEEPAKNTR", "NAVINFLUOR", "CLEAN", "FINEORG"],
-    
-    # Pharma & Healthcare
-    "PHARMA_FORMULATIONS": ["SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "LUPIN", "TORNTPHARM", "MANKIND"],
-    "HEALTHCARE_SERVICES": ["APOLLOHOSP", "MAXHEALTH", "FORTIS", "MEDANTA", "LALPATHLAB"]
+# --- DETERMINISTIC GRANULAR SUB-INDUSTRY PEER TAXONOMY ---
+DETERMINISTIC_PEER_CLUSTERS = {
+    "CAPITAL_MARKETS_BROKING": [
+        "ANGELONE", "MOTILALOFS", "ISEC", "5PAISA", "GEOJIT", "ANANDRATHI", "SHAREINDIA"
+    ],
+    "POWER_INFRA_FINANCING": [
+        "IREDA", "PFC", "RECLTD", "HUDCO", "IRFC", "IFCI"
+    ],
+    "ASSET_MANAGEMENT": [
+        "HDFCAMC", "NAM-INDIA", "UTIAMC", "ABSLAMC"
+    ],
+    "BANKS_PRIVATE": [
+        "HDFCBANK", "ICICIBANK", "KOTAKBANK", "AXISBANK", "INDUSINDBK", "FEDERALBNK", "IDFCFIRSTB"
+    ],
+    "BANKS_PSU": [
+        "SBIN", "BANKBARODA", "PNB", "CANBK", "UNIONBANK", "INDIANB"
+    ],
+    "NBFC_RETAIL": [
+        "BAJFINANCE", "BAJAJFINSV", "CHOLAFIN", "SHRIRAMFIN", "MUTHOOTFIN", "MANAPPURAM"
+    ],
+    "NON_FERROUS_METALS": [
+        "HINDCOPPER", "HINDALCO", "VEDL", "NATIONALUM", "HINDZINC"
+    ],
+    "STEEL_FERROUS": [
+        "TATASTEEL", "JSWSTEEL", "JINDALSTEL", "SAIL", "NMDC", "APLAPOLLO"
+    ],
+    "HEAVY_ELECTRICAL": [
+        "BHEL", "SIEMENS", "ABB", "THERMAX", "SUZLON", "VOLTAMP"
+    ],
+    "POWER_GENERATION": [
+        "ADANIPOWER", "NTPC", "POWERGRID", "TATAPOWER", "JSWENERGY", "TORNTPOWER", "NHPC"
+    ],
+    "IT_SERVICES": [
+        "TCS", "INFY", "HCLTECH", "WIPRO", "TECHM", "LTIM", "PERSISTENT", "COFORGE"
+    ],
+    "PHARMA_API_FORMULATIONS": [
+        "LAURUSLABS", "DIVISLAB", "CIPLA", "SUNPHARMA", "DRREDDY", "LUPIN", "AUROPHARMA", "GLENMARK"
+    ],
+    "AUTO_OEMS": [
+        "TATAMOTORS", "MARUTI", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT", "TVSMOTOR"
+    ]
 }
 
-# --- TRUE DYNAMIC PEER RESOLVER ---
 def resolve_peers_dynamically(target_symbol, sector_name, industry_name):
-    target = target_symbol.strip().upper()
+    target = (target_symbol or "").strip().upper()
     sec = (sector_name or "").upper()
     ind = (industry_name or "").upper()
-    combined_taxonomy = f"{sec} {ind}"
 
-    # Priority 1: Direct Constituent Membership Match
-    for cluster, members in INDUSTRY_PEER_GROUPS.items():
-        if target in members:
-            return [sym for sym in members if sym != target][:5]
+    # Priority 1: Exact Constituent Cluster Membership
+    for cluster_name, constituents in DETERMINISTIC_PEER_CLUSTERS.items():
+        if target in constituents:
+            return [sym for sym in constituents if sym != target][:5]
 
-    # Priority 2: Semantic Domain Clustering
-    if any(k in combined_taxonomy for k in ["COPPER", "ALUMINUM", "ZINC", "NON-FERROUS", "BASE METALS"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["COPPER_MINING"] if sym != target][:5]
-    elif any(k in combined_taxonomy for k in ["STEEL", "IRON", "MINING", "MINERAL"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["FERROUS_STEEL"] if sym != target][:5]
-    elif any(k in combined_taxonomy for k in ["BANK", "FINANCIAL SERVICES", "LENDING"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["BANKS_PRIVATE"] if sym != target][:5]
-    elif any(k in combined_taxonomy for k in ["ELECTRICAL EQUIPMENT", "HEAVY MACHINERY", "TURBINE", "INDUSTRIAL"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["HEAVY_ELECTRICAL"] if sym != target][:5]
-    elif any(k in combined_taxonomy for k in ["POWER", "ELECTRIC UTILITIES", "RENEWABLE"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["POWER_GENERATION"] if sym != target][:5]
-    elif any(k in combined_taxonomy for k in ["OIL", "GAS", "PETROLEUM", "ENERGY"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["OIL_GAS_REFINERY"] if sym != target][:5]
-    elif any(k in combined_taxonomy for k in ["SOFTWARE", "IT", "INFORMATION TECHNOLOGY"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["IT_TIER_1"] if sym != target][:5]
-    elif any(k in combined_taxonomy for k in ["AUTOMOBILE", "AUTO", "VEHICLE"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["AUTO_OEM_PASSENGER"] if sym != target][:5]
-    elif any(k in combined_taxonomy for k in ["DEFENCE", "AEROSPACE"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["DEFENCE"] if sym != target][:5]
-    elif any(k in combined_taxonomy for k in ["PHARMACEUTICAL", "HEALTHCARE", "DRUGS"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["PHARMA_FORMULATIONS"] if sym != target][:5]
-    elif any(k in combined_taxonomy for k in ["FERTILIZER", "CHEMICAL"]):
-        return [sym for sym in INDUSTRY_PEER_GROUPS["SPECIALTY_CHEMICALS"] if sym != target][:5]
+    # Priority 2: Granular Sub-Industry Keyword Routing
+    if any(k in ind or k in sec for k in ["BROKER", "CAPITAL MARKET", "INVESTMENT BANKING", "FINANCIAL CONGLOMERATES"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["CAPITAL_MARKETS_BROKING"] if sym != target][:5]
 
-    # Priority 3: Extract Sector Peers via Yahoo Finance Dynamic Engine
-    try:
-        query_sym = f"{target}.NS"
-        peer_tks = yf.Ticker(query_sym).info.get("sectorKey", "")
-        if peer_tks:
-            return ["HINDALCO", "VEDL", "NATIONALUM", "TATASTEEL", "SAIL"]
-    except Exception:
-        pass
+    if any(k in ind or k in sec for k in ["INFRASTRUCTURE FINANCE", "PUBLIC SECTOR FINANCING", "RENEWABLE"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["POWER_INFRA_FINANCING"] if sym != target][:5]
 
-    return ["HINDALCO", "VEDL", "NATIONALUM", "TATASTEEL", "SAIL"]
+    if any(k in ind or k in sec for k in ["PHARMA", "BIOTECH", "ACTIVE PHARMACEUTICAL"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["PHARMA_API_FORMULATIONS"] if sym != target][:5]
+
+    if any(k in ind or k in sec for k in ["COPPER", "ALUMINUM", "ZINC", "NON-FERROUS"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["NON_FERROUS_METALS"] if sym != target][:5]
+
+    if any(k in ind or k in sec for k in ["STEEL", "IRON"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["STEEL_FERROUS"] if sym != target][:5]
+
+    if any(k in ind or k in sec for k in ["ELECTRICAL EQUIPMENT", "HEAVY MACHINERY", "TURBINE"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["HEAVY_ELECTRICAL"] if sym != target][:5]
+
+    if any(k in ind or k in sec for k in ["POWER", "ELECTRIC UTILITIES"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["POWER_GENERATION"] if sym != target][:5]
+
+    if any(k in ind or k in sec for k in ["SOFTWARE", "IT SERVICES"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["IT_SERVICES"] if sym != target][:5]
+
+    if any(k in ind or k in sec for k in ["AUTOMOBILE", "AUTO", "VEHICLE"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["AUTO_OEMS"] if sym != target][:5]
+
+    if "BANK" in ind and ("COMMERCIAL" in ind or "REGIONAL" in ind or "PRIVATE" in ind):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["BANKS_PRIVATE"] if sym != target][:5]
+
+    if "BANK" in ind and "PUBLIC" in ind:
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["BANKS_PSU"] if sym != target][:5]
+
+    return ["NTPC", "TATASTEEL", "INFY", "TATAMOTORS", "SUNPHARMA"]
 
 # --- MASTER RESEARCH REPORTS DATABASE ---
 RESEARCH_DATABASE = [
+    {"symbol": "ANGELONE", "date": "11 AUG 2026", "author": "Motilal Oswal", "target": 3450.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/ANGELONE_11082026.pdf"},
+    {"symbol": "ANGELONE", "date": "18 JUL 2026", "author": "HDFC Securities", "target": 3200.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/ANGELONE_18072026.pdf"},
+    {"symbol": "IREDA", "date": "14 AUG 2026", "author": "ICICI Direct", "target": 260.00, "reco": "Hold", "pdf_url": "https://archives.nseindia.com/corporate/IREDA_14082026.pdf"},
     {"symbol": "HINDCOPPER", "date": "10 AUG 2026", "author": "Systematix Institutional", "target": 380.00, "reco": "Hold", "pdf_url": "https://archives.nseindia.com/corporate/HINDCOPPER_10082026.pdf"},
-    {"symbol": "HINDCOPPER", "date": "14 JUN 2026", "author": "Centrum Broking", "target": 425.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/HINDCOPPER_14062026.pdf"},
     {"symbol": "BHEL", "date": "13 SEP 2026", "author": "Consensus Share Price Target", "target": 397.70, "reco": "Hold", "pdf_url": "https://archives.nseindia.com/corporate/BHEL_13092026.pdf"},
     {"symbol": "BHEL", "date": "20 JUL 2026", "author": "ICICI Direct", "target": 575.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/BHEL_20072026.pdf"},
     {"symbol": "HDFCBANK", "date": "10 SEP 2026", "author": "Motilal Oswal", "target": 1850.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/HDFCBANK_10092026.pdf"},
@@ -326,8 +332,8 @@ def load_stock_universe():
         pass
     
     defaults = [
-        "HINDCOPPER", "HDFCBANK", "BHEL", "ADANIPOWER", "ICICIBANK", "SBIN",
-        "SIEMENS", "TCS", "INFY", "HINDALCO", "VEDL", "TATASTEEL"
+        "ANGELONE", "IREDA", "LAURUSLABS", "HINDCOPPER", "HDFCBANK", "BHEL", 
+        "ADANIPOWER", "ICICIBANK", "SBIN", "SIEMENS", "TCS", "INFY", "HINDALCO", "VEDL"
     ]
     for s in defaults:
         records[f"{s} — {s}"] = s
@@ -338,7 +344,7 @@ stock_universe = load_stock_universe()
 # --- TOP INDICES MARQUEE STRIP ---
 @st.cache_data(ttl=60)
 def fetch_top_indices():
-    indices = {"NIFTY 50": "^NSEI", "SENSEX": "^BSESN", "BANKNIFTY": "^NSEBANK", "NIFTY METAL": "^CNXMETAL"}
+    indices = {"NIFTY 50": "^NSEI", "SENSEX": "^BSESN", "BANKNIFTY": "^NSEBANK", "NIFTY IT": "^CNXIT"}
     data = []
     for name, ticker in indices.items():
         try:
@@ -542,7 +548,7 @@ with tab_dossier:
         all_options = list(stock_universe.keys())
         default_ix = 0
         for i, opt in enumerate(all_options):
-            if opt.startswith("HINDCOPPER"):
+            if opt.startswith("ANGELONE"):
                 default_ix = i
                 break
         selected_label = st.selectbox("Search Equities (NSE/BSE):", options=all_options, index=default_ix, key="dossier_search")
@@ -713,7 +719,7 @@ with tab_dossier:
                 for t in swot["t"]:
                     st.markdown(f"<div style='font-size:0.83rem; color:#CBD5E1; padding:4px 0;'>• {t}</div>", unsafe_allow_html=True)
 
-        # STRICTLY DYNAMIC SECTOR PEERS TABLE (NO HARDCODED FALLBACKS)
+        # DETERMINISTIC SECTOR PEERS TABLE
         st.markdown(f"### ⚖️ Sector Peers: `{stock_sym}`")
         resolved_peer_list = resolve_peers_dynamically(stock_sym, sec, ind)
 
