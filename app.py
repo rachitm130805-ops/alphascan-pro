@@ -383,43 +383,33 @@ FULL_INDEX_CONSTITUENTS = {
     ]
 }
 
-# --- ACCURATE COMPREHENSIVE SECTOR PEER TAXONOMY ---
+# --- DETERMINISTIC PEER CLUSTERS ---
 DETERMINISTIC_PEER_CLUSTERS = {
-    # 1. Oil & Gas Refining, Marketing, Petrochemicals (IOC, BPCL, HPCL)
+    # Wealth Management, Advisory & Capital AMCs (360 ONE, Nuvama, Anand Rathi)
+    "WEALTH_MANAGEMENT": [
+        "360ONE", "NUVAMA", "ANANDRATHI", "HDFCAMC", "NAM-INDIA", "UTIAMC"
+    ],
+    # Oil & Gas, Refining, Fuel Marketing (IOC, BPCL, HPCL)
     "OIL_GAS_REFINING": [
         "IOC", "IOCL", "BPCL", "HPCL", "RELIANCE", "ONGC", "OIL", "MRPL", "GAIL", "PETRONET"
     ],
-    # 2. Conglomerates, Infrastructure & Natural Resources (Adani Ent, L&T, Adani Ports)
+    # Conglomerates, Infra & Ports
     "DIVERSIFIED_CONGLOMERATE": [
         "ADANIENT", "LT", "ADANIPORTS", "GMRINFRA", "GRASIM", "VEDL"
     ],
-    # 3. New-Age Tech & Consumer Platforms
     "NEW_AGE_INTERNET": ["ETERNAL", "SWIGGY", "PAYTM", "NYKAA", "POLICYBZR", "NAUKRI"],
-    # 4. Capital Markets & Stockbroking
     "CAPITAL_MARKETS_BROKING": ["ANGELONE", "MOTILALOFS", "ISEC", "5PAISA", "GEOJIT", "ANANDRATHI"],
-    # 5. Renewable / Green Energy & Infrastructure Finance
     "POWER_INFRA_FINANCING": ["IREDA", "PFC", "RECLTD", "HUDCO", "IRFC"],
-    # 6. Asset Management Companies
     "ASSET_MANAGEMENT": ["HDFCAMC", "NAM-INDIA", "UTIAMC", "ABSLAMC"],
-    # 7. Private Sector Commercial Banks
     "BANKS_PRIVATE": ["HDFCBANK", "ICICIBANK", "KOTAKBANK", "AXISBANK", "INDUSINDBK", "FEDERALBNK"],
-    # 8. Public Sector Undertaking (PSU) Banks
     "BANKS_PSU": ["SBIN", "BANKBARODA", "PNB", "CANBK", "UNIONBANK"],
-    # 9. Retail & Diversified NBFCs
     "NBFC_RETAIL": ["BAJFINANCE", "BAJAJFINSV", "CHOLAFIN", "SHRIRAMFIN", "MUTHOOTFIN"],
-    # 10. Non-Ferrous Metals & Base Mining (Copper, Zinc, Aluminium)
     "NON_FERROUS_METALS": ["HINDCOPPER", "HINDALCO", "VEDL", "NATIONALUM", "HINDZINC"],
-    # 11. Steel & Ferrous Metals
     "STEEL_FERROUS": ["TATASTEEL", "JSWSTEEL", "JINDALSTEL", "SAIL", "NMDC"],
-    # 12. Heavy Electricals & Capital Machinery
     "HEAVY_ELECTRICAL": ["BHEL", "SIEMENS", "ABB", "THERMAX", "SUZLON"],
-    # 13. Power Generation & Transmission Utilities
     "POWER_GENERATION": ["ADANIPOWER", "NTPC", "POWERGRID", "TATAPOWER", "JSWENERGY"],
-    # 14. Tier-1 Software & IT Services
     "IT_SERVICES": ["TCS", "INFY", "HCLTECH", "WIPRO", "TECHM", "LTIM"],
-    # 15. Pharmaceuticals & API Formulations
     "PHARMA_API_FORMULATIONS": ["LAURUSLABS", "DIVISLAB", "CIPLA", "SUNPHARMA", "DRREDDY", "LUPIN"],
-    # 16. Automotive OEMs
     "AUTO_OEMS": ["TATAMOTORS", "MARUTI", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT"]
 }
 
@@ -429,12 +419,15 @@ def resolve_peers_dynamically(target_symbol, sector_name, industry_name):
     ind = (industry_name or "").upper()
     combined = f"{sec} {ind}"
 
-    # Priority 1: Exact Constituent Match (Adani Ent, IOC, etc.)
+    # Priority 1: Exact Constituent Match
     for cluster_name, constituents in DETERMINISTIC_PEER_CLUSTERS.items():
         if target in constituents:
             return [sym for sym in constituents if sym != target][:5]
 
-    # Priority 2: Precise Semantic Taxonomy Mapping
+    # Priority 2: Precise Taxonomy Routing
+    if any(k in combined for k in ["WEALTH", "ASSET MANAGEMENT", "ADVISORY"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["WEALTH_MANAGEMENT"] if sym != target][:5]
+
     if any(k in combined for k in ["OIL", "PETROLEUM", "REFIN", "GAS", "FUEL"]):
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["OIL_GAS_REFINING"] if sym != target][:5]
 
@@ -474,8 +467,8 @@ def resolve_peers_dynamically(target_symbol, sector_name, industry_name):
     if "BANK" in ind:
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["BANKS_PRIVATE"] if sym != target][:5]
 
-    # Neutral Large-Cap Industrial Benchmark Fallback (Never dumps into pure IT/Bank)
-    return ["LT", "RELIANCE", "NTPC", "TATASTEEL", "ONGC"]
+    # No arbitrary fallbacks: If no exact peers exist, return empty list
+    return []
 
 # --- DIRECT ACCESS INSTITUTIONAL REPORTS ARCHIVE ---
 DIRECT_REPORT_ARCHIVES = {
@@ -532,9 +525,9 @@ def load_stock_universe():
         pass
     
     defaults = [
-        "BHEL", "ADANIENT", "IOC", "BPCL", "HPCL", "ETERNAL", "ANGELONE", "IREDA", 
-        "LAURUSLABS", "HINDCOPPER", "HDFCBANK", "ADANIPOWER", "ICICIBANK", "SBIN", 
-        "SIEMENS", "TCS", "INFY", "HINDALCO", "VEDL"
+        "BHEL", "360ONE", "ADANIENT", "IOC", "BPCL", "HPCL", "ETERNAL", "ANGELONE", 
+        "IREDA", "LAURUSLABS", "HINDCOPPER", "HDFCBANK", "ADANIPOWER", "ICICIBANK", 
+        "SBIN", "SIEMENS", "TCS", "INFY", "HINDALCO", "VEDL"
     ]
     for s in defaults:
         records[f"{s} — {s}"] = s
@@ -953,17 +946,20 @@ if st.session_state.main_nav_tab == "📊 Institutional Stock Dossier":
 
         st.markdown(f"### ⚖️ Sector Peers: `{stock_sym}`")
         resolved_peers = resolve_peers_dynamically(stock_sym, sec, ind)
-        peer_prices = batch_fetch_prices([stock_sym] + resolved_peers)
 
-        peer_data = []
-        for p in [stock_sym] + resolved_peers:
-            p_price = peer_prices.get(p, {}).get("cmp", "-")
-            peer_data.append({
-                "Symbol": p,
-                "LTP (₹)": p_price,
-                "P/E (TTM)": round(inf.get("trailingPE", 0), 1) if p == stock_sym and inf.get("trailingPE") else "-"
-            })
-        st.dataframe(pd.DataFrame(peer_data), use_container_width=True)
+        if resolved_peers:
+            peer_prices = batch_fetch_prices([stock_sym] + resolved_peers)
+            peer_data = []
+            for p in [stock_sym] + resolved_peers:
+                p_price = peer_prices.get(p, {}).get("cmp", "-")
+                peer_data.append({
+                    "Symbol": p,
+                    "LTP (₹)": p_price,
+                    "P/E (TTM)": round(inf.get("trailingPE", 0), 1) if p == stock_sym and inf.get("trailingPE") else "-"
+                })
+            st.dataframe(pd.DataFrame(peer_data), use_container_width=True)
+        else:
+            st.info(f"No direct verified sector peers mapped for {stock_sym}.")
 
     # 2. FORECASTER
     with subtab_forecaster:
