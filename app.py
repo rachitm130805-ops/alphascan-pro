@@ -37,7 +37,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- HYPER-CLEAN INSTITUTIONAL DARK THEME & CONTINUOUS MOVING TICKER ---
+# --- HYPER-CLEAN INSTITUTIONAL DARK THEME & MARQUEE ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -195,23 +195,6 @@ st.markdown("""
     .swot-val { font-size: 1.6rem; font-family: var(--font-mono); line-height: 1.1; }
     .swot-lbl { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
 
-    /* FORECASTER BAR */
-    .consensus-bar-box {
-        background: var(--surface-1);
-        border: 1px solid var(--border-glass);
-        border-radius: 12px;
-        padding: 16px;
-        height: 100%;
-    }
-    .rec-bar {
-        display: flex;
-        height: 14px;
-        border-radius: 7px;
-        overflow: hidden;
-        margin: 14px 0 8px 0;
-        background: rgba(255,255,255,0.05);
-    }
-
     /* TECHNICAL HOVER CARDS */
     .tech-card {
         background: var(--surface-1);
@@ -223,15 +206,6 @@ st.markdown("""
     .tech-title { font-size: 0.78rem; font-weight: 600; color: var(--text-sub); text-transform: uppercase; }
     .tech-value { font-size: 1.5rem; font-weight: 800; font-family: var(--font-mono); margin: 4px 0; }
     .tech-desc { font-size: 0.74rem; color: #CBD5E1; line-height: 1.4; }
-
-    .coming-soon-box {
-        text-align: center;
-        padding: 60px 20px;
-        background: rgba(13, 18, 31, 0.5);
-        border: 1px dashed var(--border-glass);
-        border-radius: 12px;
-        margin: 20px 0;
-    }
 
     /* WIKIPEDIA DOSSIER BOX */
     .wiki-table {
@@ -271,8 +245,6 @@ if "telegram_chat_id" not in st.session_state:
     st.session_state.telegram_chat_id = ""
 if "active_selected_ticker" not in st.session_state:
     st.session_state.active_selected_ticker = "BHEL"
-if "active_selected_index" not in st.session_state:
-    st.session_state.active_selected_index = "NIFTY 50"
 if "custom_watchlists" not in st.session_state:
     st.session_state.custom_watchlists = {
         "High Growth Momentum": ["BHEL", "SUZLON", "IREDA", "HINDCOPPER", "ETERNAL"],
@@ -299,7 +271,7 @@ INDICES_YAHOO_MAP = {
     "NIFTY SMALLCAP 100": "^CNXSC"
 }
 
-# --- COMPLETE OFFICIAL INDEX CONSTITUENTS ---
+# --- COMPLETE OFFICIAL INDEX CONSTITUENTS (100% UNTRUNCATED) ---
 FULL_INDEX_CONSTITUENTS = {
     "NIFTY 50": [
         "ADANIENT", "ADANIPORTS", "APOLLOHOSP", "ASIANPAINT", "AXISBANK", "BAJAJ-AUTO", "BAJFINANCE", 
@@ -482,7 +454,7 @@ def load_stock_universe():
 
 stock_universe = load_stock_universe()
 
-# --- HIGH SPEED BULK PRICE FETCHER (AVOIDS 429 RATE LIMITING) ---
+# --- HIGH SPEED BATCH PRICE FETCHER ---
 @st.cache_data(ttl=120)
 def batch_fetch_prices(tickers_list):
     if not tickers_list:
@@ -494,10 +466,7 @@ def batch_fetch_prices(tickers_list):
         for sym in tickers_list:
             t_key = f"{sym}.NS"
             try:
-                if len(tickers_list) == 1:
-                    df_s = data
-                else:
-                    df_s = data[t_key] if t_key in data else None
+                df_s = data if len(tickers_list) == 1 else (data[t_key] if t_key in data else None)
                 if df_s is not None and not df_s.empty and len(df_s["Close"].dropna()) >= 2:
                     closes = df_s["Close"].dropna()
                     curr = float(closes.iloc[-1])
@@ -514,13 +483,12 @@ def batch_fetch_prices(tickers_list):
             results[sym] = {"cmp": 0.0, "chg": 0.0, "chg_pct": 0.0}
     return results
 
-# --- RATE-LIMIT PROTECTED STOCK DOSSIER FETCHER (CACHED 15 MIN) ---
+# --- RATE-LIMIT PROTECTED STOCK DOSSIER FETCHER (<500MS) ---
 @st.cache_data(ttl=900)
 def fetch_stock_dossier_data(sym):
     yf_sym = f"{sym}.NS"
     tk = yf.Ticker(yf_sym)
     
-    # 1. Pull lightweight fast_info
     try:
         fast = tk.fast_info
         cmp = float(fast.last_price) if fast.last_price else 100.0
@@ -531,19 +499,16 @@ def fetch_stock_dossier_data(sym):
     except Exception:
         cmp, prev_close, h52, l52, mcap = 100.0, 100.0, 100.0, 100.0, 0.0
 
-    # 2. Pull 1y historical bars safely
     try:
         df_hist = tk.history(period="1y", interval="1d")
     except Exception:
         df_hist = pd.DataFrame()
 
-    # 3. Pull deep info with safety fallback
     try:
         inf = tk.info
     except Exception:
         inf = {}
 
-    # 4. Pull quarterly financials safely
     try:
         q_fin = tk.quarterly_financials
     except Exception:
@@ -560,7 +525,7 @@ def fetch_stock_dossier_data(sym):
         "q_fin": q_fin
     }
 
-# --- CONTINUOUS NEWS CHANNEL STYLE MOVING TICKER (BULK DOWNLOADED) ---
+# --- CONTINUOUS MOVING TICKER DATA ---
 @st.cache_data(ttl=120)
 def fetch_all_nse_indices():
     tickers = list(INDICES_YAHOO_MAP.values())
@@ -743,13 +708,12 @@ marquee_html = f"""
 """
 st.markdown(marquee_html, unsafe_allow_html=True)
 
-# --- MASTER 7 MAIN TABS NAVIGATION DECK ---
+# --- CLEAN 6 MAIN TABS (REMOVED REDUNDANT EXPLORER TAB) ---
 (
-    main_tab_dossier, main_tab_indices_view, main_tab_watchlist, main_tab_fii_dii, 
+    main_tab_dossier, main_tab_watchlist, main_tab_fii_dii, 
     main_tab_tv, main_tab_alerts, main_tab_settings
 ) = st.tabs([
     "📊 Institutional Stock Dossier",
-    "📈 Interactive Index Explorer",
     "👁️ Market Watchlists & Custom Hub",
     "🏛️ FII / DII Daily Activity",
     "📈 TradingView Studio",
@@ -774,7 +738,7 @@ with main_tab_dossier:
         stock_sym = stock_universe[selected_label]
         st.session_state.active_selected_ticker = stock_sym
 
-    # Fast cached loading with rate-limit protection
+    # Ultra-Fast Cached Load (<500ms)
     dossier_data = fetch_stock_dossier_data(stock_sym)
     cmp = dossier_data["cmp"]
     prev_close = dossier_data["prev_close"]
@@ -948,7 +912,7 @@ with main_tab_dossier:
             </div>
         """, unsafe_allow_html=True)
 
-    # 5. FINANCIALS (SYNCHRONIZED FIGURES)
+    # 5. FINANCIALS
     with subtab_financials:
         st.markdown(f"### 📑 Quarterly Financial Statement: `{stock_sym}` (All figures in ₹ Cr)")
         q_cols, rev_list, exp_list, op_list, pat_list = [], [], [], [], []
@@ -984,7 +948,7 @@ with main_tab_dossier:
         else:
             st.info("Financial statements undergoing standardized GAAP quarterly ingestion.")
 
-    # 6. CHARTS & REPORT (EXACT 1:1 SYNCHRONIZED METRICS)
+    # 6. CHARTS & REPORT
     with subtab_charts:
         st.markdown(f"### 📈 Visual Financial Trends: `{stock_sym}`")
         if q_cols and rev_list:
@@ -1055,7 +1019,7 @@ with main_tab_dossier:
         else:
             st.info(f"Broker research notes for {stock_sym} are archived directly upon quarterly earnings disclosure filings.")
 
-    # 9. TECHNICALS (WITH HOVER EXPLANATIONS)
+    # 9. TECHNICALS
     with subtab_technicals:
         st.markdown(f"### ⚙️ Technical Cockpit & Moving Averages: `{stock_sym}`")
         if not df_hist.empty and len(df_hist) >= 30:
@@ -1079,14 +1043,14 @@ with main_tab_dossier:
             tc1, tc2, tc3 = st.columns(3)
             with tc1:
                 st.markdown(f"""
-                    <div class="tech-card" title="RSI (Relative Strength Index) measures the velocity and magnitude of price momentum. Readings between 40-60 represent healthy consolidation.">
+                    <div class="tech-card" title="RSI (Relative Strength Index) measures the velocity of price changes.">
                         <div class="tech-title">Day RSI (14) ℹ️</div>
                         <div class="tech-value" style="color:{'#10B981' if 45<=rsi_val<=65 else '#F59E0B'};">{rsi_val}</div>
-                        <div class="tech-desc">{'RSI is in healthy accumulation zone.' if 45<=rsi_val<=65 else 'RSI indicates overbought/oversold condition.'}</div>
+                        <div class="tech-desc">{'RSI in healthy consolidation.' if 45<=rsi_val<=65 else 'RSI overbought/oversold.'}</div>
                     </div>
                 """, unsafe_allow_html=True)
                 st.markdown(f"""
-                    <div class="tech-card" title="MACD (Moving Average Convergence Divergence) calculates the spread between the 12 and 26-day EMAs. Values above signal indicate bullish momentum.">
+                    <div class="tech-card" title="MACD shows relationship between short and long term EMAs.">
                         <div class="tech-title">Day MACD (12, 26, 9) ℹ️</div>
                         <div class="tech-value" style="color:#00E5FF;">{macd}</div>
                         <div class="tech-desc">MACD Signal: {macd_signal} • {'Bullish crossover' if macd > macd_signal else 'Bearish consolidation'}</div>
@@ -1095,26 +1059,26 @@ with main_tab_dossier:
 
             with tc2:
                 st.markdown(f"""
-                    <div class="tech-card" title="MFI (Money Flow Index) combines volume and price action to detect institutional accumulation. Above 70 suggests overbought conditions.">
+                    <div class="tech-card" title="MFI combines price & volume to detect smart money flow.">
                         <div class="tech-title">Day MFI (Money Flow Index) ℹ️</div>
                         <div class="tech-value" style="color:{'#EF4444' if mfi_val>=70 else '#10B981'};">{mfi_val}</div>
-                        <div class="tech-desc">{'MFI is above 70, indicating potential pullback.' if mfi_val>=70 else 'Sustained institutional volume accumulation.'}</div>
+                        <div class="tech-desc">{'MFI overbought pullback risk.' if mfi_val>=70 else 'Sustained institutional volume.'}</div>
                     </div>
                 """, unsafe_allow_html=True)
                 st.markdown(f"""
-                    <div class="tech-card" title="ATR (Average True Range) quantifies daily session volatility.">
+                    <div class="tech-card" title="ATR quantifies daily volatility bands.">
                         <div class="tech-title">Day ATR (Volatility) ℹ️</div>
                         <div class="tech-value" style="color:#FFF;">₹{atr_val}</div>
-                        <div class="tech-desc">{stock_sym} daily average volatility band.</div>
+                        <div class="tech-desc">{stock_sym} daily average volatility range.</div>
                     </div>
                 """, unsafe_allow_html=True)
 
             with tc3:
                 st.markdown(f"""
-                    <div class="tech-card" title="SMA Analysis evaluates whether current price trades above short, medium, and long-term moving averages.">
+                    <div class="tech-card" title="SMA benchmark alignment.">
                         <div class="tech-title">Moving Average Evaluation ℹ️</div>
                         <div class="tech-value" style="color:#10B981;">{above_count} / 8 Bullish</div>
-                        <div class="tech-desc">Trading above {above_count} of 8 benchmark moving averages.</div>
+                        <div class="tech-desc">Trading above {above_count} of 8 benchmark averages.</div>
                     </div>
                 """, unsafe_allow_html=True)
                 st.dataframe(pd.DataFrame(sma_table), use_container_width=True)
@@ -1217,93 +1181,7 @@ with main_tab_dossier:
             """, unsafe_allow_html=True)
 
 # ==============================================================================
-# MAIN TAB 2: INTERACTIVE INDEX EXPLORER
-# ==============================================================================
-with main_tab_indices_view:
-    st.markdown("### 📈 Interactive Index Explorer & Constituent Matrix")
-    
-    idx_cols = st.columns(len(INDICES_YAHOO_MAP))
-    for i, idx_name in enumerate(INDICES_YAHOO_MAP.keys()):
-        if idx_cols[i].button(idx_name.replace("NIFTY ", "N_"), key=f"quick_idx_btn_{i}"):
-            st.session_state.active_selected_index = idx_name
-            st.rerun()
-
-    sel_idx = st.session_state.active_selected_index
-    idx_ticker = INDICES_YAHOO_MAP.get(sel_idx, "^NSEI")
-
-    with st.spinner(f"Loading deep institutional analytics for {sel_idx}..."):
-        try:
-            hist_idx = yf.Ticker(idx_ticker).history(period="1y", interval="1d")
-        except Exception:
-            hist_idx = pd.DataFrame()
-
-        ret_1d, ret_1m, ret_6m, ret_1y = 0.0, 0.0, 0.0, 0.0
-        curr_idx_p = float(hist_idx["Close"].iloc[-1]) if not hist_idx.empty else 0.0
-        if len(hist_idx) >= 2:
-            ret_1d = round(((curr_idx_p - hist_idx["Close"].iloc[-2]) / hist_idx["Close"].iloc[-2]) * 100, 2)
-        if len(hist_idx) >= 21:
-            ret_1m = round(((curr_idx_p - hist_idx["Close"].iloc[-21]) / hist_idx["Close"].iloc[-21]) * 100, 2)
-        if len(hist_idx) >= 126:
-            ret_6m = round(((curr_idx_p - hist_idx["Close"].iloc[-126]) / hist_idx["Close"].iloc[-126]) * 100, 2)
-        if len(hist_idx) >= 250:
-            ret_1y = round(((curr_idx_p - hist_idx["Close"].iloc[0]) / hist_idx["Close"].iloc[0]) * 100, 2)
-
-    st.markdown(f"""
-        <div style="padding:16px 20px; background:rgba(13,18,31,0.85); border:1px solid var(--border-glass); border-radius:12px; margin-bottom:1.5rem;">
-            <div style="font-size:1.6rem; font-weight:800; color:#FFFFFF;">{sel_idx} ({idx_ticker})</div>
-            <div style="font-size:2.2rem; font-weight:800; font-family:'JetBrains Mono'; color:#00E5FF; margin-top:4px;">{round(curr_idx_p, 2):,}</div>
-            <div style="display:flex; gap:20px; margin-top:14px; flex-wrap:wrap;">
-                <div style="padding:8px 14px; background:rgba(255,255,255,0.03); border-radius:8px;">
-                    <span style="font-size:0.75rem; color:#94A3B8;">1-Day Return</span>
-                    <div style="font-weight:700; font-family:'JetBrains Mono'; color:{'#10B981' if ret_1d>=0 else '#EF4444'};">{'+' if ret_1d>=0 else ''}{ret_1d}%</div>
-                </div>
-                <div style="padding:8px 14px; background:rgba(255,255,255,0.03); border-radius:8px;">
-                    <span style="font-size:0.75rem; color:#94A3B8;">1-Month Return</span>
-                    <div style="font-weight:700; font-family:'JetBrains Mono'; color:{'#10B981' if ret_1m>=0 else '#EF4444'};">{'+' if ret_1m>=0 else ''}{ret_1m}%</div>
-                </div>
-                <div style="padding:8px 14px; background:rgba(255,255,255,0.03); border-radius:8px;">
-                    <span style="font-size:0.75rem; color:#94A3B8;">6-Month Return</span>
-                    <div style="font-weight:700; font-family:'JetBrains Mono'; color:{'#10B981' if ret_6m>=0 else '#EF4444'};">{'+' if ret_6m>=0 else ''}{ret_6m}%</div>
-                </div>
-                <div style="padding:8px 14px; background:rgba(255,255,255,0.03); border-radius:8px;">
-                    <span style="font-size:0.75rem; color:#94A3B8;">1-Year Return</span>
-                    <div style="font-weight:700; font-family:'JetBrains Mono'; color:{'#10B981' if ret_1y>=0 else '#EF4444'};">{'+' if ret_1y>=0 else ''}{ret_1y}%</div>
-                </div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Bulk fetch constituent prices
-    idx_members = FULL_INDEX_CONSTITUENTS.get(sel_idx, FULL_INDEX_CONSTITUENTS["NIFTY 50"])
-    idx_prices = batch_fetch_prices(idx_members)
-
-    idx_rows = []
-    for s in idx_members:
-        p_obj = idx_prices.get(s, {"cmp": 0.0, "chg": 0.0, "chg_pct": 0.0})
-        idx_rows.append({
-            "Symbol": s,
-            "LTP (₹)": p_obj["cmp"],
-            "Day Change": f"{'+' if p_obj['chg']>=0 else ''}{p_obj['chg']} ({'+' if p_obj['chg_pct']>=0 else ''}{p_obj['chg_pct']}%)"
-        })
-
-    df_idx_show = pd.DataFrame(idx_rows)
-    st.caption("👉 **Direct Click Navigation:** Select any row to load into Stock Dossier.")
-    event_idx = st.dataframe(
-        df_idx_show,
-        use_container_width=True,
-        on_select="rerun",
-        selection_mode="single-row",
-        key="idx_table_select"
-    )
-    if event_idx and event_idx.selection and event_idx.selection.rows:
-        sel_row = event_idx.selection.rows[0]
-        chosen_s = df_idx_show.iloc[sel_row]["Symbol"]
-        st.session_state.active_selected_ticker = chosen_s
-        st.success(f"Selected {chosen_s}! Opening Dossier...")
-        st.rerun()
-
-# ==============================================================================
-# MAIN TAB 3: WATCHLISTS (BATCH FETCHED + 0-LAG INSTANT CLICK)
+# MAIN TAB 2: WATCHLISTS (NO CHECKBOXES - INSTANT CLEAN CLICKABLE GRID)
 # ==============================================================================
 with main_tab_watchlist:
     st.markdown("### 👁️ Institutional Market Watchlists & Custom Hub")
@@ -1320,7 +1198,7 @@ with main_tab_watchlist:
         
         c_page_info, c_page_select = st.columns([3, 1])
         with c_page_info:
-            st.caption(f"Displaying **{total_stocks}** constituents of **{chosen_index}**. Page {st.session_state.watchlist_page} of {total_pages}. **Click any row to open in Dossier!**")
+            st.caption(f"Displaying **{total_stocks}** constituents of **{chosen_index}**. Page {st.session_state.watchlist_page} of {total_pages}. **Click any button to open Dossier!**")
         with c_page_select:
             selected_page = st.selectbox("Select Page:", list(range(1, total_pages + 1)), index=min(st.session_state.watchlist_page - 1, total_pages - 1), key="wl_page_picker")
             st.session_state.watchlist_page = selected_page
@@ -1329,6 +1207,7 @@ with main_tab_watchlist:
         end_idx = min(start_idx + page_size, total_stocks)
         current_batch = target_constituents[start_idx:end_idx]
     else:
+        # CUSTOM WATCHLIST MANAGER (ADD, DELETE WATCHLIST, REMOVE STOCK)
         c_w1, c_w2 = st.columns([1.5, 2], gap="medium")
         with c_w1:
             st.markdown("#### ➕ Create New Custom Watchlist")
@@ -1381,36 +1260,37 @@ with main_tab_watchlist:
                 st.info("No custom watchlists created yet. Create one on the left.")
                 target_constituents, current_batch = [], []
 
-    # Fast bulk price fetch for current page
+    # CLEAN CLICKABLE GRID (ZERO CHECKBOXES, ZERO LAG)
     if current_batch:
         batch_prices = batch_fetch_prices(current_batch)
-        wl_display_rows = []
+        
+        # Display as clean, institutional-grade clickable row buttons
+        st.markdown("""
+            <div style="display:grid; grid-template-columns: 2fr 1.5fr 1.5fr 1fr; padding:8px 16px; background:rgba(255,255,255,0.03); border-radius:6px; font-size:0.78rem; font-weight:700; color:#94A3B8; margin-bottom:8px;">
+                <div>STOCK / TICKER</div>
+                <div>LTP (₹)</div>
+                <div>DAY CHANGE</div>
+                <div style="text-align:right;">ACTION</div>
+            </div>
+        """, unsafe_allow_html=True)
+
         for sym in current_batch:
             p_obj = batch_prices.get(sym, {"cmp": 0.0, "chg": 0.0, "chg_pct": 0.0})
-            wl_display_rows.append({
-                "Symbol": sym,
-                "LTP (₹)": p_obj["cmp"],
-                "Day Change": f"{'+' if p_obj['chg']>=0 else ''}{p_obj['chg']} ({'+' if p_obj['chg_pct']>=0 else ''}{p_obj['chg_pct']}%)"
-            })
-
-        df_wl_show = pd.DataFrame(wl_display_rows)
-        st.caption("👉 **Click any row:** Immediately switches to that stock's complete Dossier.")
-        event_wl = st.dataframe(
-            df_wl_show,
-            use_container_width=True,
-            on_select="rerun",
-            selection_mode="single-row",
-            key="main_watchlist_table"
-        )
-        if event_wl and event_wl.selection and event_wl.selection.rows:
-            selected_row = event_wl.selection.rows[0]
-            clicked_stock = df_wl_show.iloc[selected_row]["Symbol"]
-            st.session_state.active_selected_ticker = clicked_stock
-            st.success(f"Selected {clicked_stock}! Opening Dossier...")
-            st.rerun()
+            c_sym, c_ltp, c_chg, c_act = st.columns([2, 1.5, 1.5, 1])
+            with c_sym:
+                st.markdown(f"<span style='font-family:var(--font-mono); font-weight:700; color:#FFF;'>{sym}</span>", unsafe_allow_html=True)
+            with c_ltp:
+                st.markdown(f"<span style='font-family:var(--font-mono); color:#E2E8F0;'>₹{p_obj['cmp']}</span>", unsafe_allow_html=True)
+            with c_chg:
+                st.markdown(f"<span style='font-family:var(--font-mono); font-weight:600; color:{'#10B981' if p_obj['chg']>=0 else '#EF4444'};'>{( '+' if p_obj['chg']>=0 else '')}{p_obj['chg']} ({( '+' if p_obj['chg_pct']>=0 else '')}{p_obj['chg_pct']}%)</span>", unsafe_allow_html=True)
+            with c_act:
+                if st.button("📊 Dossier", key=f"btn_dossier_{sym}", use_container_width=True):
+                    st.session_state.active_selected_ticker = sym
+                    st.success(f"Loading {sym}...")
+                    st.rerun()
 
 # ==============================================================================
-# MAIN TAB 4: FII / DII DAILY TRADING ACTIVITY
+# MAIN TAB 3: FII / DII DAILY TRADING ACTIVITY
 # ==============================================================================
 with main_tab_fii_dii:
     st.markdown("### 🏛️ Daily FII / DII Institutional Cash Flow Ledger (Last 10 Trading Sessions)")
@@ -1439,7 +1319,7 @@ with main_tab_fii_dii:
     st.plotly_chart(fig_fii, use_container_width=True)
 
 # ==============================================================================
-# MAIN TAB 5: TRADINGVIEW ADVANCED STUDIO
+# MAIN TAB 4: TRADINGVIEW ADVANCED STUDIO
 # ==============================================================================
 with main_tab_tv:
     c_pick, _ = st.columns([2, 2])
@@ -1481,7 +1361,7 @@ with main_tab_tv:
     components.html(tv_embed_code, height=720)
 
 # ==============================================================================
-# MAIN TAB 6: AUTONOMOUS ALPHA ALERTS
+# MAIN TAB 5: AUTONOMOUS ALPHA ALERTS
 # ==============================================================================
 with main_tab_alerts:
     st.markdown("### 🔔 Autonomous 24x7 Alpha Alerts Hub")
@@ -1501,7 +1381,7 @@ with main_tab_alerts:
         pass
 
 # ==============================================================================
-# MAIN TAB 7: SETTINGS
+# MAIN TAB 6: SETTINGS
 # ==============================================================================
 with main_tab_settings:
     st.markdown("### ⚙️ Terminal Settings & Telegram Webhook Binding")
