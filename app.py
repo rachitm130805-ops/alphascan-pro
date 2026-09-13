@@ -195,6 +195,23 @@ st.markdown("""
     .swot-val { font-size: 1.6rem; font-family: var(--font-mono); line-height: 1.1; }
     .swot-lbl { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
 
+    /* FORECASTER BAR */
+    .consensus-bar-box {
+        background: var(--surface-1);
+        border: 1px solid var(--border-glass);
+        border-radius: 12px;
+        padding: 16px;
+        height: 100%;
+    }
+    .rec-bar {
+        display: flex;
+        height: 14px;
+        border-radius: 7px;
+        overflow: hidden;
+        margin: 14px 0 8px 0;
+        background: rgba(255,255,255,0.05);
+    }
+
     /* TECHNICAL HOVER CARDS */
     .tech-card {
         background: var(--surface-1);
@@ -228,6 +245,25 @@ st.markdown("""
         font-weight: 500;
     }
 
+    /* CLICKABLE STOCK ROW CARDS */
+    div[data-testid="stHorizontalBlock"] button[kind="secondary"] {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.07) !important;
+        color: #FFFFFF !important;
+        font-family: var(--font-mono) !important;
+        font-weight: 600 !important;
+        text-align: left !important;
+        padding: 8px 14px !important;
+        border-radius: 8px !important;
+        transition: all 0.15s ease-in-out !important;
+    }
+    div[data-testid="stHorizontalBlock"] button[kind="secondary"]:hover {
+        background: rgba(0, 229, 255, 0.12) !important;
+        border-color: var(--accent-cyan) !important;
+        transform: translateX(4px) !important;
+        color: var(--accent-cyan) !important;
+    }
+
     .stButton > button {
         background: linear-gradient(135deg, #00E5FF 0%, #10B981 100%) !important;
         color: #07090E !important;
@@ -245,6 +281,8 @@ if "telegram_chat_id" not in st.session_state:
     st.session_state.telegram_chat_id = ""
 if "active_selected_ticker" not in st.session_state:
     st.session_state.active_selected_ticker = "BHEL"
+if "main_nav_tab" not in st.session_state:
+    st.session_state.main_nav_tab = "📊 Institutional Stock Dossier"
 if "custom_watchlists" not in st.session_state:
     st.session_state.custom_watchlists = {
         "High Growth Momentum": ["BHEL", "SUZLON", "IREDA", "HINDCOPPER", "ETERNAL"],
@@ -271,7 +309,7 @@ INDICES_YAHOO_MAP = {
     "NIFTY SMALLCAP 100": "^CNXSC"
 }
 
-# --- COMPLETE OFFICIAL INDEX CONSTITUENTS (100% UNTRUNCATED) ---
+# --- COMPLETE OFFICIAL INDEX CONSTITUENTS ---
 FULL_INDEX_CONSTITUENTS = {
     "NIFTY 50": [
         "ADANIENT", "ADANIPORTS", "APOLLOHOSP", "ASIANPAINT", "AXISBANK", "BAJAJ-AUTO", "BAJFINANCE", 
@@ -708,23 +746,35 @@ marquee_html = f"""
 """
 st.markdown(marquee_html, unsafe_allow_html=True)
 
-# --- CLEAN 6 MAIN TABS (REMOVED REDUNDANT EXPLORER TAB) ---
-(
-    main_tab_dossier, main_tab_watchlist, main_tab_fii_dii, 
-    main_tab_tv, main_tab_alerts, main_tab_settings
-) = st.tabs([
+# --- PROGRAMMATIC MASTER TOP NAVIGATION DECK ---
+NAV_OPTIONS = [
     "📊 Institutional Stock Dossier",
     "👁️ Market Watchlists & Custom Hub",
     "🏛️ FII / DII Daily Activity",
     "📈 TradingView Studio",
     "🔔 Autonomous Alpha Alerts",
     "⚙️ Settings"
-])
+]
+
+# Ensure valid session state
+if st.session_state.main_nav_tab not in NAV_OPTIONS:
+    st.session_state.main_nav_tab = NAV_OPTIONS[0]
+
+current_nav = st.segmented_control(
+    "Navigation Hub:",
+    options=NAV_OPTIONS,
+    default=st.session_state.main_nav_tab,
+    label_visibility="collapsed"
+)
+
+if current_nav != st.session_state.main_nav_tab:
+    st.session_state.main_nav_tab = current_nav
+    st.rerun()
 
 # ==============================================================================
 # MAIN TAB 1: INSTITUTIONAL STOCK DOSSIER
 # ==============================================================================
-with main_tab_dossier:
+if st.session_state.main_nav_tab == "📊 Institutional Stock Dossier":
     c_sel, _ = st.columns([2.5, 1.5])
     with c_sel:
         all_options = list(stock_universe.keys())
@@ -1181,9 +1231,9 @@ with main_tab_dossier:
             """, unsafe_allow_html=True)
 
 # ==============================================================================
-# MAIN TAB 2: WATCHLISTS (NO CHECKBOXES - INSTANT CLEAN CLICKABLE GRID)
+# MAIN TAB 2: WATCHLISTS (CLICK ANY STOCK NAME -> DIRECT DOSSIER REDIRECTION)
 # ==============================================================================
-with main_tab_watchlist:
+elif st.session_state.main_nav_tab == "👁️ Market Watchlists & Custom Hub":
     st.markdown("### 👁️ Institutional Market Watchlists & Custom Hub")
 
     wl_category = st.radio("Watchlist Mode:", ["Pre-Built Index Watchlists (Full Constituents)", "My Custom Watchlists (Up to 50 Stocks)"], horizontal=True)
@@ -1198,7 +1248,7 @@ with main_tab_watchlist:
         
         c_page_info, c_page_select = st.columns([3, 1])
         with c_page_info:
-            st.caption(f"Displaying **{total_stocks}** constituents of **{chosen_index}**. Page {st.session_state.watchlist_page} of {total_pages}. **Click any button to open Dossier!**")
+            st.caption(f"Displaying **{total_stocks}** constituents of **{chosen_index}**. Page {st.session_state.watchlist_page} of {total_pages}. **Click any stock to open its full Dossier!**")
         with c_page_select:
             selected_page = st.selectbox("Select Page:", list(range(1, total_pages + 1)), index=min(st.session_state.watchlist_page - 1, total_pages - 1), key="wl_page_picker")
             st.session_state.watchlist_page = selected_page
@@ -1207,7 +1257,7 @@ with main_tab_watchlist:
         end_idx = min(start_idx + page_size, total_stocks)
         current_batch = target_constituents[start_idx:end_idx]
     else:
-        # CUSTOM WATCHLIST MANAGER (ADD, DELETE WATCHLIST, REMOVE STOCK)
+        # CUSTOM WATCHLIST MANAGER
         c_w1, c_w2 = st.columns([1.5, 2], gap="medium")
         with c_w1:
             st.markdown("#### ➕ Create New Custom Watchlist")
@@ -1260,39 +1310,37 @@ with main_tab_watchlist:
                 st.info("No custom watchlists created yet. Create one on the left.")
                 target_constituents, current_batch = [], []
 
-    # CLEAN CLICKABLE GRID (ZERO CHECKBOXES, ZERO LAG)
+    # ZERO-LAG INTERACTIVE CLICK GRID (CLICKING ANY STOCK OPENS DOSSIER INSTANTLY)
     if current_batch:
         batch_prices = batch_fetch_prices(current_batch)
         
-        # Display as clean, institutional-grade clickable row buttons
         st.markdown("""
-            <div style="display:grid; grid-template-columns: 2fr 1.5fr 1.5fr 1fr; padding:8px 16px; background:rgba(255,255,255,0.03); border-radius:6px; font-size:0.78rem; font-weight:700; color:#94A3B8; margin-bottom:8px;">
-                <div>STOCK / TICKER</div>
+            <div style="display:grid; grid-template-columns: 2.5fr 1.5fr 1.5fr; padding:10px 16px; background:rgba(255,255,255,0.04); border-radius:8px; font-size:0.8rem; font-weight:700; color:#94A3B8; margin-bottom:10px;">
+                <div>STOCK / CONSTITUENT (CLICK TO VIEW DOSSIER)</div>
                 <div>LTP (₹)</div>
-                <div>DAY CHANGE</div>
-                <div style="text-align:right;">ACTION</div>
+                <div>DAY CHANGE (%)</div>
             </div>
         """, unsafe_allow_html=True)
 
         for sym in current_batch:
             p_obj = batch_prices.get(sym, {"cmp": 0.0, "chg": 0.0, "chg_pct": 0.0})
-            c_sym, c_ltp, c_chg, c_act = st.columns([2, 1.5, 1.5, 1])
+            c_sym, c_ltp, c_chg = st.columns([2.5, 1.5, 1.5])
             with c_sym:
-                st.markdown(f"<span style='font-family:var(--font-mono); font-weight:700; color:#FFF;'>{sym}</span>", unsafe_allow_html=True)
-            with c_ltp:
-                st.markdown(f"<span style='font-family:var(--font-mono); color:#E2E8F0;'>₹{p_obj['cmp']}</span>", unsafe_allow_html=True)
-            with c_chg:
-                st.markdown(f"<span style='font-family:var(--font-mono); font-weight:600; color:{'#10B981' if p_obj['chg']>=0 else '#EF4444'};'>{( '+' if p_obj['chg']>=0 else '')}{p_obj['chg']} ({( '+' if p_obj['chg_pct']>=0 else '')}{p_obj['chg_pct']}%)</span>", unsafe_allow_html=True)
-            with c_act:
-                if st.button("📊 Dossier", key=f"btn_dossier_{sym}", use_container_width=True):
+                # Stock name button: Clicking triggers immediate redirection to Dossier
+                if st.button(f"⚡ {sym}", key=f"wl_click_{sym}", use_container_width=True, type="secondary"):
                     st.session_state.active_selected_ticker = sym
-                    st.success(f"Loading {sym}...")
+                    st.session_state.main_nav_tab = "📊 Institutional Stock Dossier"
                     st.rerun()
+            with c_ltp:
+                st.markdown(f"<div style='padding-top:8px; font-family:var(--font-mono); font-size:1.05rem; font-weight:700; color:#E2E8F0;'>₹{p_obj['cmp']}</div>", unsafe_allow_html=True)
+            with c_chg:
+                chg_color = "#10B981" if p_obj['chg'] >= 0 else "#EF4444"
+                st.markdown(f"<div style='padding-top:8px; font-family:var(--font-mono); font-size:0.95rem; font-weight:600; color:{chg_color};'>{( '+' if p_obj['chg']>=0 else '')}{p_obj['chg']} ({( '+' if p_obj['chg_pct']>=0 else '')}{p_obj['chg_pct']}%)</div>", unsafe_allow_html=True)
 
 # ==============================================================================
 # MAIN TAB 3: FII / DII DAILY TRADING ACTIVITY
 # ==============================================================================
-with main_tab_fii_dii:
+elif st.session_state.main_nav_tab == "🏛️ FII / DII Daily Activity":
     st.markdown("### 🏛️ Daily FII / DII Institutional Cash Flow Ledger (Last 10 Trading Sessions)")
     st.caption("Provisional Net Buy / Sell Cash Flow Data on NSE & BSE (All values in ₹ Crores)")
 
@@ -1321,7 +1369,7 @@ with main_tab_fii_dii:
 # ==============================================================================
 # MAIN TAB 4: TRADINGVIEW ADVANCED STUDIO
 # ==============================================================================
-with main_tab_tv:
+elif st.session_state.main_nav_tab == "📈 TradingView Studio":
     c_pick, _ = st.columns([2, 2])
     with c_pick:
         tv_sym = st.selectbox("Select Chart Equity:", options=list(stock_universe.keys()), index=0, key="main_tv_picker")
@@ -1363,7 +1411,7 @@ with main_tab_tv:
 # ==============================================================================
 # MAIN TAB 5: AUTONOMOUS ALPHA ALERTS
 # ==============================================================================
-with main_tab_alerts:
+elif st.session_state.main_nav_tab == "🔔 Autonomous Alpha Alerts":
     st.markdown("### 🔔 Autonomous 24x7 Alpha Alerts Hub")
     st.caption("Central alert dispatcher monitoring technical and price parameters in real-time.")
 
@@ -1383,7 +1431,7 @@ with main_tab_alerts:
 # ==============================================================================
 # MAIN TAB 6: SETTINGS
 # ==============================================================================
-with main_tab_settings:
+elif st.session_state.main_nav_tab == "⚙️ Settings":
     st.markdown("### ⚙️ Terminal Settings & Telegram Webhook Binding")
     with st.form("main_tg_settings"):
         tg_id = st.text_input("Telegram Chat ID:", value=st.session_state.telegram_chat_id)
