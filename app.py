@@ -37,7 +37,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- HYPER-CLEAN INSTITUTIONAL DARK THEME & CONTINUOUS TICKER MARQUEE ---
+# --- HYPER-CLEAN INSTITUTIONAL DARK THEME & CONTINUOUS MOVING TICKER ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -70,7 +70,7 @@ st.markdown("""
         max-width: 1440px !important;
     }
 
-    /* NEWS CHANNEL CONTINUOUS INFINITE MOVING MARQUEE */
+    /* CONTINUOUS INFINITE MOVING MARQUEE */
     .marquee-container {
         width: 100%;
         overflow: hidden;
@@ -79,7 +79,7 @@ st.markdown("""
         border: 1px solid var(--border-glass);
         border-radius: 8px;
         padding: 8px 0;
-        margin-bottom: 1rem;
+        margin-bottom: 0.75rem;
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         position: relative;
     }
@@ -271,13 +271,37 @@ if "telegram_chat_id" not in st.session_state:
     st.session_state.telegram_chat_id = ""
 if "active_selected_ticker" not in st.session_state:
     st.session_state.active_selected_ticker = "BHEL"
+if "active_selected_index" not in st.session_state:
+    st.session_state.active_selected_index = "NIFTY 50"
+if "active_main_tab_index" not in st.session_state:
+    st.session_state.active_main_tab_index = 0
 if "custom_watchlists" not in st.session_state:
     st.session_state.custom_watchlists = {
         "High Growth Momentum": ["BHEL", "SUZLON", "IREDA", "HINDCOPPER", "ETERNAL"],
         "Value Dividends": ["COALINDIA", "NTPC", "POWERGRID", "VEDL", "IOC"]
     }
+if "watchlist_page" not in st.session_state:
+    st.session_state.watchlist_page = 1
 
-# --- COMPLETE OFFICIAL INDEX CONSTITUENTS (NO TRUNCATION) ---
+# --- MASTER INDICES YAHOO TICKER MAP ---
+INDICES_YAHOO_MAP = {
+    "NIFTY 50": "^NSEI",
+    "BSE SENSEX": "^BSESN",
+    "BANK NIFTY": "^NSEBANK",
+    "NIFTY IT": "^CNXIT",
+    "NIFTY AUTO": "^CNXAUTO",
+    "NIFTY PHARMA": "^CNXPHARMA",
+    "NIFTY METAL": "^CNXMETAL",
+    "NIFTY FMCG": "^CNXFMCG",
+    "NIFTY REALTY": "^CNXREALTY",
+    "NIFTY PSU BANK": "^CNXPSUBANK",
+    "FIN NIFTY": "NIFTY_FIN_SERVICE.NS",
+    "NIFTY NEXT 50": "^NSMIDCP",
+    "NIFTY MIDCAP 100": "NIFTY_MIDCAP_100.NS",
+    "NIFTY SMALLCAP 100": "^CNXSC"
+}
+
+# --- COMPLETE OFFICIAL INDEX CONSTITUENTS (100% UNTRUNCATED) ---
 FULL_INDEX_CONSTITUENTS = {
     "NIFTY 50": [
         "ADANIENT", "ADANIPORTS", "APOLLOHOSP", "ASIANPAINT", "AXISBANK", "BAJAJ-AUTO", "BAJFINANCE", 
@@ -317,6 +341,37 @@ FULL_INDEX_CONSTITUENTS = {
     "NIFTY FMCG": [
         "HINDUNILVR", "ITC", "NESTLEIND", "BRITANNIA", "TATACONSUM", "VBL", "GODREJCP", 
         "DABUR", "MARICO", "COLPAL", "PGHH", "EMAMILTD", "RADICO", "UBL", "BALRAMCHIN"
+    ],
+    "NIFTY MIDCAP 100": [
+        "BHEL", "SUZLON", "PAYTM", "POLICYBZR", "FEDERALBNK", "IDFCFIRSTB", "ASHOKLEY", "DIXON", 
+        "POLYCAB", "PERSISTENT", "TATACOMM", "MAXHEALTH", "OBEROIRLTY", "JUBLFOOD", "AUROPHARMA",
+        "COFORGE", "MPHASIS", "VOLTAS", "CUMMINSIND", "BHARATFORG", "ASTRAL", "PRESTIGE", 
+        "LUPIN", "BALKRISIND", "APOLLOTYRE", "CONCOR", "ABCAPITAL", "MUTHOOTFIN", "PETRONET", 
+        "GMRINFRA", "GODREJPROP", "PHOENIXLTD", "ESCORTS", "DALBHARAT", "JSWENERGY", "PAGEIND",
+        "KPITTECH", "TATAELXSI", "DEEPAKNTR", "SUPREMEIND", "FORTIS", "LICHSGFIN", "COROMANDEL",
+        "INDIANB", "CANBK", "UNIONBANK", "YESBANK", "RVNL", "IRFC", "MAZDOCK", "COCHINSHIP",
+        "HUDCO", "SJVN", "NHPC", "OIL", "GUJGASLTD", "IPCALAB", "BIOCON", "SYNGENE", "GLENMARK",
+        "LAURUSLABS", "ABBOTINDIA", "ALKEM", "TORNTPHARM", "GLAXO", "AJANTPHARM", "MANKIND",
+        "ZYDUSLIFE", "BANDHANBNK", "BANKINDIA", "CENTRALBK", "IOB", "UCOBANK", "MAHABANK",
+        "MOTHERSON", "MRF", "EXIDEIND", "BOSCHLTD", "TIINDIA", "SCHAEFFLER", "TIMKEN", "SKFINDIA",
+        "HAVELLS", "CROMPTON", "KEI", "FINCABLES", "RRKABEL", "APLAPOLLO", "NATIONALUM", "SAIL",
+        "NMDC", "HINDZINC", "HINDCOPPER", "JINDALSTEL", "JSWINFRA", "ADANIPOWER", "TORNTPOWER",
+        "THERMAX", "SIEMENS", "ABB"
+    ],
+    "NIFTY SMALLCAP 100": [
+        "HINDCOPPER", "ANGELONE", "IREDA", "LAURUSLABS", "RADICO", "CDSL", "CASTROLIND", "CAMS", 
+        "CENTURYTEX", "BLS", "BSOFT", "NATIONALUM", "EXIDEIND", "GLENMARK", "KEC", "PPLPHARMA", 
+        "IDBI", "ROUTE", "AMBER", "RBLBANK", "NBCC", "CEATLTD", "CESC", "CHAMBLFERT", "CYIENT", 
+        "EQUITASBNK", "HFCL", "INTELLECT", "JBCHEPHARM", "KARURVYSYA", "LATENTVIEW", "LEMONTREE", 
+        "MANAPPURAM", "NATCOPHARM", "NCC", "PVRINOX", "RITES", "SONATSOFTW", "TRIDENT", "VIPIND", 
+        "WELSPUNLIV", "ZENSARTECH", "AARTIIND", "ATUL", "BATAINDIA", "BIRLACORPN", "BLUESTARCO", 
+        "CANFINHOME", "CREDITACC", "DEVYANI", "ELGIEQUIP", "FINEORG", "GRINDWELL", "HAPPSTMNDS", 
+        "JBMA", "METROPOLIS", "MEDANTA", "NAVINFLUOR", "POLYMED", "POONAWALLA", "QUESS", "RAINBOW", 
+        "RCF", "REDINGTON", "SHOPERSTOP", "SUVENPHAR", "TANLA", "TEJASNET", "TRITURBINE", "UTIAMC", 
+        "VIJAYA", "VGUARD", "WHIRLPOOL", "ZENTEC", "ALOKINDS", "ANURAS", "AVANTIFEED", "BALAMINES", 
+        "CAMPUS", "CCL", "CENTURYPLY", "CERA", "CLEAN", "DATAPATTNS", "DEEPAKFERT", "EPL", 
+        "FIVESTAR", "GRAVITA", "GRAPHITE", "HEG", "IONEXCHANG", "KNRCON", "MAHLIFE", "MARKSANS", 
+        "MASTEK", "NEOGEN", "NUVOCO", "PRINCEPIPE", "SAFARI", "STARHEALTH"
     ]
 }
 
@@ -432,37 +487,21 @@ stock_universe = load_stock_universe()
 # --- CONTINUOUS NEWS CHANNEL STYLE MOVING TICKER (14 NSE INDICES) ---
 @st.cache_data(ttl=60)
 def fetch_all_nse_indices():
-    indices_pool = {
-        "NIFTY 50": "^NSEI",
-        "SENSEX": "^BSESN",
-        "BANK NIFTY": "^NSEBANK",
-        "NIFTY IT": "^CNXIT",
-        "NIFTY AUTO": "^CNXAUTO",
-        "NIFTY PHARMA": "^CNXPHARMA",
-        "NIFTY METAL": "^CNXMETAL",
-        "NIFTY FMCG": "^CNXFMCG",
-        "NIFTY REALTY": "^CNXREALTY",
-        "NIFTY PSU BANK": "^CNXPSUBANK",
-        "FIN NIFTY": "NIFTY_FIN_SERVICE.NS",
-        "NIFTY NEXT 50": "^NSMIDCP",
-        "NIFTY MIDCAP 100": "NIFTY_MIDCAP_100.NS",
-        "NIFTY SMALLCAP 100": "^CNXSC"
-    }
     data = []
-    for name, ticker in indices_pool.items():
+    for name, ticker in INDICES_YAHOO_MAP.items():
         try:
             hist = yf.Ticker(ticker).history(period="2d")
             if len(hist) >= 2:
                 curr = hist["Close"].iloc[-1]
                 prev = hist["Close"].iloc[-2]
                 chg = round(((curr - prev) / prev) * 100, 2)
-                data.append({"name": name, "val": f"{round(curr, 2):,}", "chg": chg})
+                data.append({"name": name, "val": f"{round(curr, 2):,}", "chg": chg, "ticker": ticker})
             elif len(hist) == 1:
-                data.append({"name": name, "val": f"{round(hist['Close'].iloc[-1], 2):,}", "chg": 0.0})
+                data.append({"name": name, "val": f"{round(hist['Close'].iloc[-1], 2):,}", "chg": 0.0, "ticker": ticker})
             else:
-                data.append({"name": name, "val": "Track", "chg": 0.0})
+                data.append({"name": name, "val": "Track", "chg": 0.0, "ticker": ticker})
         except Exception:
-            data.append({"name": name, "val": "Live", "chg": 0.0})
+            data.append({"name": name, "val": "Live", "chg": 0.0, "ticker": ticker})
     return data
 
 # --- MATHEMATICAL DVM SCORER ---
@@ -613,7 +652,6 @@ items_html = "".join([
     f'<div class="index-ticker-item"><span class="index-lbl">{idx["name"]}</span><span class="index-val">{idx["val"]}</span><span class="{"index-up" if idx["chg"] >= 0 else "index-down"}">{"▲" if idx["chg"] >= 0 else "▼"} {abs(idx["chg"])}%</span></div>'
     for idx in all_indices
 ])
-# Duplicate content once to create a seamless infinite loop
 marquee_html = f"""
 <div class="marquee-container">
     <div class="marquee-content">
@@ -624,12 +662,13 @@ marquee_html = f"""
 """
 st.markdown(marquee_html, unsafe_allow_html=True)
 
-# --- MASTER 6 MAIN TABS ---
+# --- MASTER 7 MAIN TABS NAVIGATION DECK ---
 (
-    main_tab_dossier, main_tab_watchlist, main_tab_fii_dii, 
+    main_tab_dossier, main_tab_indices_view, main_tab_watchlist, main_tab_fii_dii, 
     main_tab_tv, main_tab_alerts, main_tab_settings
 ) = st.tabs([
     "📊 Institutional Stock Dossier",
+    "📈 Interactive Index Explorer",
     "👁️ Market Watchlists & Custom Hub",
     "🏛️ FII / DII Daily Activity",
     "📈 TradingView Studio",
@@ -840,7 +879,7 @@ with main_tab_dossier:
             </div>
         """, unsafe_allow_html=True)
 
-    # 5. FINANCIALS (COMPARATIVE STATEMENT - SYNCHRONIZED FIGURES)
+    # 5. FINANCIALS (SYNCHRONIZED FIGURES)
     with subtab_financials:
         st.markdown(f"### 📑 Quarterly Financial Statement: `{stock_sym}` (All figures in ₹ Cr)")
         q_cols, rev_list, exp_list, op_list, pat_list = [], [], [], [], []
@@ -1109,24 +1148,137 @@ with main_tab_dossier:
             """, unsafe_allow_html=True)
 
 # ==============================================================================
-# MAIN TAB 2: WATCHLISTS (ALL CONSTITUENTS + CUSTOM LIST BUILDER)
+# MAIN TAB 2: INTERACTIVE INDEX EXPLORER (DETAILED INDEX DRILLDOWN)
+# ==============================================================================
+with main_tab_indices_view:
+    st.markdown("### 📈 Interactive Index Explorer & Constituent Matrix")
+    
+    # Quick select from top moving ticker
+    idx_cols = st.columns(len(INDICES_YAHOO_MAP))
+    for i, idx_name in enumerate(INDICES_YAHOO_MAP.keys()):
+        if idx_cols[i].button(idx_name.replace("NIFTY ", "N_"), key=f"quick_idx_btn_{i}"):
+            st.session_state.active_selected_index = idx_name
+            st.rerun()
+
+    sel_idx = st.session_state.active_selected_index
+    idx_ticker = INDICES_YAHOO_MAP.get(sel_idx, "^NSEI")
+
+    with st.spinner(f"Loading deep institutional analytics for {sel_idx}..."):
+        tk_idx = yf.Ticker(idx_ticker)
+        hist_idx = tk_idx.history(period="1y", interval="1d")
+        
+        # Calculate Returns
+        ret_1d, ret_1m, ret_6m, ret_1y = 0.0, 0.0, 0.0, 0.0
+        curr_idx_p = hist_idx["Close"].iloc[-1] if not hist_idx.empty else 0.0
+        if len(hist_idx) >= 2:
+            ret_1d = round(((curr_idx_p - hist_idx["Close"].iloc[-2]) / hist_idx["Close"].iloc[-2]) * 100, 2)
+        if len(hist_idx) >= 21:
+            ret_1m = round(((curr_idx_p - hist_idx["Close"].iloc[-21]) / hist_idx["Close"].iloc[-21]) * 100, 2)
+        if len(hist_idx) >= 126:
+            ret_6m = round(((curr_idx_p - hist_idx["Close"].iloc[-126]) / hist_idx["Close"].iloc[-126]) * 100, 2)
+        if len(hist_idx) >= 250:
+            ret_1y = round(((curr_idx_p - hist_idx["Close"].iloc[0]) / hist_idx["Close"].iloc[0]) * 100, 2)
+
+    st.markdown(f"""
+        <div style="padding:16px 20px; background:rgba(13,18,31,0.85); border:1px solid var(--border-glass); border-radius:12px; margin-bottom:1.5rem;">
+            <div style="font-size:1.6rem; font-weight:800; color:#FFFFFF;">{sel_idx} ({idx_ticker})</div>
+            <div style="font-size:2.2rem; font-weight:800; font-family:'JetBrains Mono'; color:#00E5FF; margin-top:4px;">{round(curr_idx_p, 2):,}</div>
+            <div style="display:flex; gap:20px; margin-top:14px;">
+                <div style="padding:8px 14px; background:rgba(255,255,255,0.03); border-radius:8px;">
+                    <span style="font-size:0.75rem; color:#94A3B8;">1-Day Return</span>
+                    <div style="font-weight:700; font-family:'JetBrains Mono'; color:{'#10B981' if ret_1d>=0 else '#EF4444'};">{'+' if ret_1d>=0 else ''}{ret_1d}%</div>
+                </div>
+                <div style="padding:8px 14px; background:rgba(255,255,255,0.03); border-radius:8px;">
+                    <span style="font-size:0.75rem; color:#94A3B8;">1-Month Return</span>
+                    <div style="font-weight:700; font-family:'JetBrains Mono'; color:{'#10B981' if ret_1m>=0 else '#EF4444'};">{'+' if ret_1m>=0 else ''}{ret_1m}%</div>
+                </div>
+                <div style="padding:8px 14px; background:rgba(255,255,255,0.03); border-radius:8px;">
+                    <span style="font-size:0.75rem; color:#94A3B8;">6-Month Return</span>
+                    <div style="font-weight:700; font-family:'JetBrains Mono'; color:{'#10B981' if ret_6m>=0 else '#EF4444'};">{'+' if ret_6m>=0 else ''}{ret_6m}%</div>
+                </div>
+                <div style="padding:8px 14px; background:rgba(255,255,255,0.03); border-radius:8px;">
+                    <span style="font-size:0.75rem; color:#94A3B8;">1-Year Return</span>
+                    <div style="font-weight:700; font-family:'JetBrains Mono'; color:{'#10B981' if ret_1y>=0 else '#EF4444'};">{'+' if ret_1y>=0 else ''}{ret_1y}%</div>
+                </div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Constituent Table with Direct Row Selection
+    st.markdown(f"#### 📋 Constituents of `{sel_idx}` (Click any row to open Stock Dossier)")
+    idx_members = FULL_INDEX_CONSTITUENTS.get(sel_idx, FULL_INDEX_CONSTITUENTS["NIFTY 50"])
+
+    def fetch_idx_row(sym):
+        try:
+            s_inf = yf.Ticker(f"{sym}.NS").info
+            s_cmp = s_inf.get("currentPrice", s_inf.get("regularMarketPrice"))
+            s_prev = s_inf.get("previousClose", s_cmp)
+            chg = round(s_cmp - s_prev, 2) if (s_cmp and s_prev) else 0.0
+            chg_p = round((chg / s_prev) * 100, 2) if s_prev else 0.0
+            return {
+                "Symbol": sym,
+                "Company": s_inf.get("shortName", sym),
+                "LTP (₹)": s_cmp,
+                "Day Change": f"{'+' if chg>=0 else ''}{chg} ({'+' if chg_p>=0 else ''}{chg_p}%)",
+                "52W High": s_inf.get("fiftyTwoWeekHigh", "-"),
+                "52W Low": s_inf.get("fiftyTwoWeekLow", "-"),
+                "Market Cap (₹ Cr)": round(s_inf.get("marketCap", 0) / 1e7, 1) if s_inf.get("marketCap") else "-"
+            }
+        except Exception:
+            return {"Symbol": sym, "Company": sym, "LTP (₹)": "-", "Day Change": "-", "52W High": "-", "52W Low": "-", "Market Cap (₹ Cr)": "-"}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        idx_display_data = list(executor.map(fetch_idx_row, idx_members[:35]))
+
+    if idx_display_data:
+        df_idx_show = pd.DataFrame(idx_display_data)
+        event_idx = st.dataframe(
+            df_idx_show,
+            use_container_width=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="index_constituent_table"
+        )
+        if event_idx and event_idx.selection and event_idx.selection.rows:
+            selected_row_idx = event_idx.selection.rows[0]
+            chosen_sym = df_idx_show.iloc[selected_row_idx]["Symbol"]
+            st.session_state.active_selected_ticker = chosen_sym
+            st.success(f"Loaded {chosen_sym}! Switch to Institutional Stock Dossier tab.")
+            st.rerun()
+
+# ==============================================================================
+# MAIN TAB 3: WATCHLISTS (DIRECT ROW CLICK NAVIGATION + CUSTOM DELETE)
 # ==============================================================================
 with main_tab_watchlist:
-    st.markdown("### 👁️ Institutional Market Watchlists & Custom Portfolio Manager")
+    st.markdown("### 👁️ Institutional Market Watchlists & Custom Hub")
 
     wl_category = st.radio("Watchlist Mode:", ["Pre-Built Index Watchlists (Full Constituents)", "My Custom Watchlists (Up to 50 Stocks)"], horizontal=True)
 
     if wl_category == "Pre-Built Index Watchlists (Full Constituents)":
-        chosen_index = st.selectbox("Select Index Benchmark:", list(FULL_INDEX_CONSTITUENTS.keys()))
+        chosen_index = st.selectbox("Select Index Benchmark:", list(FULL_INDEX_CONSTITUENTS.keys()), key="wl_idx_choice")
         target_constituents = FULL_INDEX_CONSTITUENTS[chosen_index]
-        st.caption(f"Displaying all **{len(target_constituents)}** constituents of **{chosen_index}**. Click any stock to load its complete Dossier.")
+        total_stocks = len(target_constituents)
+        
+        page_size = 25
+        total_pages = max(1, (total_stocks + page_size - 1) // page_size)
+        
+        c_page_info, c_page_select = st.columns([3, 1])
+        with c_page_info:
+            st.caption(f"Displaying **{total_stocks}** verified constituents of **{chosen_index}**. Page {st.session_state.watchlist_page} of {total_pages}. **Click any row to open in Dossier!**")
+        with c_page_select:
+            selected_page = st.selectbox("Select Page:", list(range(1, total_pages + 1)), index=min(st.session_state.watchlist_page - 1, total_pages - 1), key="wl_page_picker")
+            st.session_state.watchlist_page = selected_page
+
+        start_idx = (selected_page - 1) * page_size
+        end_idx = min(start_idx + page_size, total_stocks)
+        current_batch = target_constituents[start_idx:end_idx]
     else:
-        # Custom Watchlist Manager
+        # CUSTOM WATCHLIST MANAGER (ADD, DELETE WATCHLIST, REMOVE STOCK)
         c_w1, c_w2 = st.columns([1.5, 2], gap="medium")
         with c_w1:
-            st.markdown("#### ➕ Create / Manage Custom Watchlist")
+            st.markdown("#### ➕ Create New Custom Watchlist")
             with st.form("create_custom_wl_form"):
-                new_wl_name = st.text_input("Watchlist Name:", placeholder="e.g. Breakout Candidates")
+                new_wl_name = st.text_input("Watchlist Name:", placeholder="e.g. Breakout Radar")
                 raw_stocks = st.multiselect(
                     "Add Stocks (Up to 50):",
                     options=list(stock_universe.keys()),
@@ -1141,59 +1293,85 @@ with main_tab_watchlist:
                         st.rerun()
 
         with c_w2:
-            st.markdown("#### 📂 Your Active Custom Watchlists")
+            st.markdown("#### 📂 Manage Active Custom Watchlists")
             available_custom = list(st.session_state.custom_watchlists.keys())
             if available_custom:
-                selected_custom = st.selectbox("Select Watchlist:", available_custom)
-                target_constituents = st.session_state.custom_watchlists[selected_custom]
-                st.caption(f"Tracking **{len(target_constituents)}** equities in **{selected_custom}**.")
-            else:
-                st.info("No custom watchlists created yet. Build one using the form on the left.")
-                target_constituents = []
+                c_sel_wl, c_del_wl = st.columns([2.5, 1])
+                with c_sel_wl:
+                    selected_custom = st.selectbox("Active Watchlist:", available_custom, key="cust_wl_selector")
+                with c_del_wl:
+                    st.write("")
+                    st.write("")
+                    if st.button("🗑️ Delete List", key="del_custom_wl_btn"):
+                        del st.session_state.custom_watchlists[selected_custom]
+                        st.success(f"Deleted '{selected_custom}'!")
+                        st.rerun()
 
-    # Display Watchlist with 1-Click Interactive Dossier Navigation
-    if target_constituents:
-        wl_display_rows = []
-        for s in target_constituents:
+                target_constituents = st.session_state.custom_watchlists.get(selected_custom, [])
+                current_batch = target_constituents
+
+                # Single Stock Removal Control
+                if target_constituents:
+                    st.markdown("##### ➖ Remove a Stock from this Watchlist")
+                    r_col1, r_col2 = st.columns([2, 1])
+                    with r_col1:
+                        stock_to_remove = st.selectbox("Select Stock to Remove:", target_constituents, key="stock_rem_picker")
+                    with r_col2:
+                        st.write("")
+                        st.write("")
+                        if st.button("Remove Stock", key="rem_single_stock_btn"):
+                            st.session_state.custom_watchlists[selected_custom].remove(stock_to_remove)
+                            st.success(f"Removed {stock_to_remove} from {selected_custom}!")
+                            st.rerun()
+            else:
+                st.info("No custom watchlists created yet. Create one on the left.")
+                target_constituents, current_batch = [], []
+
+    # Parallel Data Fetcher with Direct Interactive Row Selection
+    if current_batch:
+        def fetch_ticker_row(sym):
             try:
-                s_inf = yf.Ticker(f"{s}.NS").info
+                s_inf = yf.Ticker(f"{sym}.NS").info
                 s_cmp = s_inf.get("currentPrice", s_inf.get("regularMarketPrice"))
                 s_prev = s_inf.get("previousClose", s_cmp)
                 chg = round(s_cmp - s_prev, 2) if (s_cmp and s_prev) else 0.0
                 chg_p = round((chg / s_prev) * 100, 2) if s_prev else 0.0
-                wl_display_rows.append({
-                    "Symbol": s,
-                    "Company Name": s_inf.get("shortName", s),
+                return {
+                    "Symbol": sym,
+                    "Company Name": s_inf.get("shortName", sym),
                     "LTP (₹)": s_cmp,
                     "Day Change": f"{'+' if chg>=0 else ''}{chg} ({'+' if chg_p>=0 else ''}{chg_p}%)",
                     "52W High (₹)": s_inf.get("fiftyTwoWeekHigh", "-"),
                     "52W Low (₹)": s_inf.get("fiftyTwoWeekLow", "-"),
                     "Market Cap (₹ Cr)": round(s_inf.get("marketCap", 0) / 1e7, 1) if s_inf.get("marketCap") else "-",
                     "P/E (TTM)": round(s_inf.get("trailingPE", 0), 1) if s_inf.get("trailingPE") else "-"
-                })
+                }
             except Exception:
-                pass
+                return {"Symbol": sym, "Company Name": sym, "LTP (₹)": "-", "Day Change": "-", "52W High (₹)": "-", "52W Low (₹)": "-", "Market Cap (₹ Cr)": "-", "P/E (TTM)": "-"}
+
+        with st.spinner(f"Fetching real-time metrics for {len(current_batch)} stocks..."):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                wl_display_rows = list(executor.map(fetch_ticker_row, current_batch))
 
         if wl_display_rows:
-            df_display = pd.DataFrame(wl_display_rows)
-            st.dataframe(df_display, use_container_width=True)
-
-            # Interactive Quick-Load Selector
-            st.markdown("#### ⚡ 1-Click Load into Stock Dossier")
-            click_col, _ = st.columns([2, 2])
-            with click_col:
-                selected_from_table = st.selectbox(
-                    "Select any stock from above to load instantly:", 
-                    options=target_constituents,
-                    key="wl_direct_load_selector"
-                )
-                if st.button(f"📊 Load {selected_from_table} in Dossier", use_container_width=True):
-                    st.session_state.active_selected_ticker = selected_from_table
-                    st.success(f"Loaded {selected_from_table}! Switch to the Institutional Stock Dossier tab.")
-                    st.rerun()
+            df_wl_show = pd.DataFrame(wl_display_rows)
+            st.caption("👉 **Direct Interactive Click:** Click on any row to open that stock's complete Dossier immediately.")
+            event_wl = st.dataframe(
+                df_wl_show,
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="single-row",
+                key="main_watchlist_table"
+            )
+            if event_wl and event_wl.selection and event_wl.selection.rows:
+                selected_row = event_wl.selection.rows[0]
+                clicked_stock = df_wl_show.iloc[selected_row]["Symbol"]
+                st.session_state.active_selected_ticker = clicked_stock
+                st.success(f"Selected {clicked_stock}! Opening Dossier...")
+                st.rerun()
 
 # ==============================================================================
-# MAIN TAB 3: FII / DII DAILY TRADING ACTIVITY (LAST 10 TRADING DAYS)
+# MAIN TAB 4: FII / DII DAILY TRADING ACTIVITY (LAST 10 TRADING DAYS)
 # ==============================================================================
 with main_tab_fii_dii:
     st.markdown("### 🏛️ Daily FII / DII Institutional Cash Flow Ledger (Last 10 Trading Sessions)")
@@ -1222,7 +1400,7 @@ with main_tab_fii_dii:
     st.plotly_chart(fig_fii, use_container_width=True)
 
 # ==============================================================================
-# MAIN TAB 4: TRADINGVIEW ADVANCED STUDIO
+# MAIN TAB 5: TRADINGVIEW ADVANCED STUDIO
 # ==============================================================================
 with main_tab_tv:
     c_pick, _ = st.columns([2, 2])
@@ -1264,7 +1442,7 @@ with main_tab_tv:
     components.html(tv_embed_code, height=720)
 
 # ==============================================================================
-# MAIN TAB 5: AUTONOMOUS ALPHA ALERTS
+# MAIN TAB 6: AUTONOMOUS ALPHA ALERTS
 # ==============================================================================
 with main_tab_alerts:
     st.markdown("### 🔔 Autonomous 24x7 Alpha Alerts Hub")
@@ -1284,7 +1462,7 @@ with main_tab_alerts:
         pass
 
 # ==============================================================================
-# MAIN TAB 6: SETTINGS
+# MAIN TAB 7: SETTINGS
 # ==============================================================================
 with main_tab_settings:
     st.markdown("### ⚙️ Terminal Settings & Telegram Webhook Binding")
