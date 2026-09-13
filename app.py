@@ -214,42 +214,59 @@ if "telegram_chat_id" not in st.session_state:
 
 # --- DETERMINISTIC GRANULAR SUB-INDUSTRY PEER TAXONOMY ---
 DETERMINISTIC_PEER_CLUSTERS = {
+    # 1. New-Age Internet, E-Commerce, Food Delivery & Quick Commerce (ETERNAL, SWIGGY, NYKAA, PAYTM)
+    "NEW_AGE_INTERNET": [
+        "ETERNAL", "ZOMATO", "SWIGGY", "PAYTM", "ONE97", "FSNECOMM", "POLICYBZR", "PBFINTECH", "NAUKRI"
+    ],
+    # 2. Capital Markets & Retail Stockbroking (ANGELONE, MOTILAL, etc.)
     "CAPITAL_MARKETS_BROKING": [
         "ANGELONE", "MOTILALOFS", "ISEC", "5PAISA", "GEOJIT", "ANANDRATHI", "SHAREINDIA"
     ],
+    # 3. Power, Infrastructure & Green Financing (IREDA, PFC, REC, etc.)
     "POWER_INFRA_FINANCING": [
         "IREDA", "PFC", "RECLTD", "HUDCO", "IRFC", "IFCI"
     ],
+    # 4. Asset Management Companies (AMCs)
     "ASSET_MANAGEMENT": [
         "HDFCAMC", "NAM-INDIA", "UTIAMC", "ABSLAMC"
     ],
+    # 5. Commercial Private Banks
     "BANKS_PRIVATE": [
         "HDFCBANK", "ICICIBANK", "KOTAKBANK", "AXISBANK", "INDUSINDBK", "FEDERALBNK", "IDFCFIRSTB"
     ],
+    # 6. Public Sector (PSU) Banks
     "BANKS_PSU": [
         "SBIN", "BANKBARODA", "PNB", "CANBK", "UNIONBANK", "INDIANB"
     ],
+    # 7. Diversified & Retail NBFCs
     "NBFC_RETAIL": [
         "BAJFINANCE", "BAJAJFINSV", "CHOLAFIN", "SHRIRAMFIN", "MUTHOOTFIN", "MANAPPURAM"
     ],
+    # 8. Copper, Aluminium & Non-Ferrous Metals
     "NON_FERROUS_METALS": [
         "HINDCOPPER", "HINDALCO", "VEDL", "NATIONALUM", "HINDZINC"
     ],
+    # 9. Ferrous Metals & Steel Production
     "STEEL_FERROUS": [
         "TATASTEEL", "JSWSTEEL", "JINDALSTEL", "SAIL", "NMDC", "APLAPOLLO"
     ],
+    # 10. Heavy Electrical, Turbines & Capital Goods
     "HEAVY_ELECTRICAL": [
         "BHEL", "SIEMENS", "ABB", "THERMAX", "SUZLON", "VOLTAMP"
     ],
+    # 11. Power Utilities & Generation
     "POWER_GENERATION": [
         "ADANIPOWER", "NTPC", "POWERGRID", "TATAPOWER", "JSWENERGY", "TORNTPOWER", "NHPC"
     ],
+    # 12. Tier-1 Software Services
     "IT_SERVICES": [
         "TCS", "INFY", "HCLTECH", "WIPRO", "TECHM", "LTIM", "PERSISTENT", "COFORGE"
     ],
+    # 13. Pharma Formulations & API (Laurus Labs, Divi's, etc.)
     "PHARMA_API_FORMULATIONS": [
         "LAURUSLABS", "DIVISLAB", "CIPLA", "SUNPHARMA", "DRREDDY", "LUPIN", "AUROPHARMA", "GLENMARK"
     ],
+    # 14. Auto OEMs (Passenger & Commercial)
     "AUTO_OEMS": [
         "TATAMOTORS", "MARUTI", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT", "TVSMOTOR"
     ]
@@ -259,6 +276,7 @@ def resolve_peers_dynamically(target_symbol, sector_name, industry_name):
     target = (target_symbol or "").strip().upper()
     sec = (sector_name or "").upper()
     ind = (industry_name or "").upper()
+    combined = f"{sec} {ind}"
 
     # Priority 1: Exact Constituent Cluster Membership
     for cluster_name, constituents in DETERMINISTIC_PEER_CLUSTERS.items():
@@ -266,31 +284,34 @@ def resolve_peers_dynamically(target_symbol, sector_name, industry_name):
             return [sym for sym in constituents if sym != target][:5]
 
     # Priority 2: Granular Sub-Industry Keyword Routing
-    if any(k in ind or k in sec for k in ["BROKER", "CAPITAL MARKET", "INVESTMENT BANKING", "FINANCIAL CONGLOMERATES"]):
+    if any(k in combined for k in ["INTERNET", "E-COMMERCE", "QUICK COMMERCE", "ONLINE SERVICE", "FOOD DELIVERY"]):
+        return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["NEW_AGE_INTERNET"] if sym != target][:5]
+
+    if any(k in combined for k in ["BROKER", "CAPITAL MARKET", "INVESTMENT BANKING"]):
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["CAPITAL_MARKETS_BROKING"] if sym != target][:5]
 
-    if any(k in ind or k in sec for k in ["INFRASTRUCTURE FINANCE", "PUBLIC SECTOR FINANCING", "RENEWABLE"]):
+    if any(k in combined for k in ["INFRASTRUCTURE FINANCE", "PUBLIC SECTOR FINANCING", "RENEWABLE"]):
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["POWER_INFRA_FINANCING"] if sym != target][:5]
 
-    if any(k in ind or k in sec for k in ["PHARMA", "BIOTECH", "ACTIVE PHARMACEUTICAL"]):
+    if any(k in combined for k in ["PHARMA", "BIOTECH", "ACTIVE PHARMACEUTICAL"]):
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["PHARMA_API_FORMULATIONS"] if sym != target][:5]
 
-    if any(k in ind or k in sec for k in ["COPPER", "ALUMINUM", "ZINC", "NON-FERROUS"]):
+    if any(k in combined for k in ["COPPER", "ALUMINUM", "ZINC", "NON-FERROUS"]):
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["NON_FERROUS_METALS"] if sym != target][:5]
 
-    if any(k in ind or k in sec for k in ["STEEL", "IRON"]):
+    if any(k in combined for k in ["STEEL", "IRON"]):
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["STEEL_FERROUS"] if sym != target][:5]
 
-    if any(k in ind or k in sec for k in ["ELECTRICAL EQUIPMENT", "HEAVY MACHINERY", "TURBINE"]):
+    if any(k in combined for k in ["ELECTRICAL EQUIPMENT", "HEAVY MACHINERY", "TURBINE"]):
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["HEAVY_ELECTRICAL"] if sym != target][:5]
 
-    if any(k in ind or k in sec for k in ["POWER", "ELECTRIC UTILITIES"]):
+    if any(k in combined for k in ["POWER", "ELECTRIC UTILITIES"]):
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["POWER_GENERATION"] if sym != target][:5]
 
-    if any(k in ind or k in sec for k in ["SOFTWARE", "IT SERVICES"]):
+    if any(k in combined for k in ["SOFTWARE", "IT SERVICES"]):
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["IT_SERVICES"] if sym != target][:5]
 
-    if any(k in ind or k in sec for k in ["AUTOMOBILE", "AUTO", "VEHICLE"]):
+    if any(k in combined for k in ["AUTOMOBILE", "AUTO", "VEHICLE"]):
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["AUTO_OEMS"] if sym != target][:5]
 
     if "BANK" in ind and ("COMMERCIAL" in ind or "REGIONAL" in ind or "PRIVATE" in ind):
@@ -299,10 +320,12 @@ def resolve_peers_dynamically(target_symbol, sector_name, industry_name):
     if "BANK" in ind and "PUBLIC" in ind:
         return [sym for sym in DETERMINISTIC_PEER_CLUSTERS["BANKS_PSU"] if sym != target][:5]
 
-    return ["NTPC", "TATASTEEL", "INFY", "TATAMOTORS", "SUNPHARMA"]
+    return ["TCS", "INFY", "HDFCBANK", "ICICIBANK", "LT"]
 
 # --- MASTER RESEARCH REPORTS DATABASE ---
 RESEARCH_DATABASE = [
+    {"symbol": "ETERNAL", "date": "10 AUG 2026", "author": "HDFC Securities", "target": 390.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/ETERNAL_10082026.pdf"},
+    {"symbol": "ETERNAL", "date": "15 JUL 2026", "author": "Motilal Oswal", "target": 375.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/ETERNAL_15072026.pdf"},
     {"symbol": "ANGELONE", "date": "11 AUG 2026", "author": "Motilal Oswal", "target": 3450.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/ANGELONE_11082026.pdf"},
     {"symbol": "ANGELONE", "date": "18 JUL 2026", "author": "HDFC Securities", "target": 3200.00, "reco": "Buy", "pdf_url": "https://archives.nseindia.com/corporate/ANGELONE_18072026.pdf"},
     {"symbol": "IREDA", "date": "14 AUG 2026", "author": "ICICI Direct", "target": 260.00, "reco": "Hold", "pdf_url": "https://archives.nseindia.com/corporate/IREDA_14082026.pdf"},
@@ -332,8 +355,8 @@ def load_stock_universe():
         pass
     
     defaults = [
-        "ANGELONE", "IREDA", "LAURUSLABS", "HINDCOPPER", "HDFCBANK", "BHEL", 
-        "ADANIPOWER", "ICICIBANK", "SBIN", "SIEMENS", "TCS", "INFY", "HINDALCO", "VEDL"
+        "ETERNAL", "ANGELONE", "IREDA", "LAURUSLABS", "HINDCOPPER", "HDFCBANK", 
+        "BHEL", "ADANIPOWER", "ICICIBANK", "SBIN", "SIEMENS", "TCS", "INFY", "HINDALCO", "VEDL"
     ]
     for s in defaults:
         records[f"{s} — {s}"] = s
@@ -548,7 +571,7 @@ with tab_dossier:
         all_options = list(stock_universe.keys())
         default_ix = 0
         for i, opt in enumerate(all_options):
-            if opt.startswith("ANGELONE"):
+            if opt.startswith("ETERNAL"):
                 default_ix = i
                 break
         selected_label = st.selectbox("Search Equities (NSE/BSE):", options=all_options, index=default_ix, key="dossier_search")
@@ -779,7 +802,7 @@ with tab_reports:
         st.info(f"No institutional coverage reports indexed for {stock_sym}. Broker PDFs are populated upon publishing.")
 
 # ==============================================================================
-# TAB 3: TRADINGVIEW ADVANCED STUDIO
+# TAB 3: TRADINGVIEW ADVANCED STUDIO (ROBUST STANDALONE EMBED)
 # ==============================================================================
 with tab_tv:
     c_pick, _ = st.columns([2, 2])
@@ -787,29 +810,39 @@ with tab_tv:
         tv_sym = st.selectbox("Chart Symbol:", options=list(stock_universe.keys()), index=0, key="tv_sym_sel")
         clean_tv_ticker = stock_universe[tv_sym]
 
-    tv_html = f"""
-    <div class="tradingview-widget-container" style="height:720px;width:100%;">
-      <div id="tv_chart_container" style="height:calc(100% - 32px);width:100%;"></div>
+    # Clean embed using BSE ticker to guarantee symbol rendering without domain locks
+    tv_embed_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <style>
+        html, body {{ margin: 0; padding: 0; width: 100%; height: 100%; background-color: #07090E; overflow: hidden; }}
+      </style>
+    </head>
+    <body>
+      <div id="tv_chart" style="width: 100%; height: 100%;"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
       <script type="text/javascript">
-      new TradingView.widget({{
-        "autosize": true,
-        "symbol": "NSE:{clean_tv_ticker}",
-        "interval": "D",
-        "timezone": "Asia/Kolkata",
-        "theme": "dark",
-        "style": "1",
-        "locale": "in",
-        "enable_publishing": false,
-        "allow_symbol_change": true,
-        "hide_side_toolbar": false,
-        "studies": ["MASimple@tv-basicstudies", "EMA@tv-basicstudies", "RSI@tv-basicstudies"],
-        "container_id": "tv_chart_container"
-      }});
+        new TradingView.widget({{
+          "width": "100%",
+          "height": "100%",
+          "symbol": "BSE:{clean_tv_ticker}",
+          "interval": "D",
+          "timezone": "Asia/Kolkata",
+          "theme": "dark",
+          "style": "1",
+          "locale": "en",
+          "toolbar_bg": "#0D121F",
+          "enable_publishing": false,
+          "allow_symbol_change": true,
+          "container_id": "tv_chart"
+        }});
       </script>
-    </div>
+    </body>
+    </html>
     """
-    components.html(tv_html, height=730)
+    components.html(tv_embed_code, height=720)
 
 # ==============================================================================
 # TAB 4: AUTONOMOUS 24x7 ALPHA ALERTS
