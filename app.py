@@ -273,8 +273,6 @@ if "active_selected_ticker" not in st.session_state:
     st.session_state.active_selected_ticker = "BHEL"
 if "active_selected_index" not in st.session_state:
     st.session_state.active_selected_index = "NIFTY 50"
-if "active_main_tab_index" not in st.session_state:
-    st.session_state.active_main_tab_index = 0
 if "custom_watchlists" not in st.session_state:
     st.session_state.custom_watchlists = {
         "High Growth Momentum": ["BHEL", "SUZLON", "IREDA", "HINDCOPPER", "ETERNAL"],
@@ -301,7 +299,7 @@ INDICES_YAHOO_MAP = {
     "NIFTY SMALLCAP 100": "^CNXSC"
 }
 
-# --- COMPLETE OFFICIAL INDEX CONSTITUENTS (100% UNTRUNCATED) ---
+# --- COMPLETE OFFICIAL INDEX CONSTITUENTS ---
 FULL_INDEX_CONSTITUENTS = {
     "NIFTY 50": [
         "ADANIENT", "ADANIPORTS", "APOLLOHOSP", "ASIANPAINT", "AXISBANK", "BAJAJ-AUTO", "BAJFINANCE", 
@@ -375,7 +373,7 @@ FULL_INDEX_CONSTITUENTS = {
     ]
 }
 
-# --- DETERMINISTIC GRANULAR SUB-INDUSTRY PEER TAXONOMY ---
+# --- DETERMINISTIC PEER MAPPING ---
 DETERMINISTIC_PEER_CLUSTERS = {
     "NEW_AGE_INTERNET": ["ETERNAL", "SWIGGY", "PAYTM", "NYKAA", "POLICYBZR", "NAUKRI"],
     "CAPITAL_MARKETS_BROKING": ["ANGELONE", "MOTILALOFS", "ISEC", "5PAISA", "GEOJIT", "ANANDRATHI"],
@@ -484,24 +482,107 @@ def load_stock_universe():
 
 stock_universe = load_stock_universe()
 
-# --- CONTINUOUS NEWS CHANNEL STYLE MOVING TICKER (14 NSE INDICES) ---
-@st.cache_data(ttl=60)
+# --- HIGH SPEED BULK PRICE FETCHER (AVOIDS 429 RATE LIMITING) ---
+@st.cache_data(ttl=120)
+def batch_fetch_prices(tickers_list):
+    if not tickers_list:
+        return {}
+    yf_tickers = [f"{t}.NS" for t in tickers_list]
+    results = {}
+    try:
+        data = yf.download(tickers=yf_tickers, period="5d", interval="1d", group_by="ticker", progress=False, threads=True)
+        for sym in tickers_list:
+            t_key = f"{sym}.NS"
+            try:
+                if len(tickers_list) == 1:
+                    df_s = data
+                else:
+                    df_s = data[t_key] if t_key in data else None
+                if df_s is not None and not df_s.empty and len(df_s["Close"].dropna()) >= 2:
+                    closes = df_s["Close"].dropna()
+                    curr = float(closes.iloc[-1])
+                    prev = float(closes.iloc[-2])
+                    chg = round(curr - prev, 2)
+                    chg_pct = round((chg / prev) * 100, 2) if prev else 0.0
+                    results[sym] = {"cmp": curr, "chg": chg, "chg_pct": chg_pct}
+                else:
+                    results[sym] = {"cmp": 0.0, "chg": 0.0, "chg_pct": 0.0}
+            except Exception:
+                results[sym] = {"cmp": 0.0, "chg": 0.0, "chg_pct": 0.0}
+    except Exception:
+        for sym in tickers_list:
+            results[sym] = {"cmp": 0.0, "chg": 0.0, "chg_pct": 0.0}
+    return results
+
+# --- RATE-LIMIT PROTECTED STOCK DOSSIER FETCHER (CACHED 15 MIN) ---
+@st.cache_data(ttl=900)
+def fetch_stock_dossier_data(sym):
+    yf_sym = f"{sym}.NS"
+    tk = yf.Ticker(yf_sym)
+    
+    # 1. Pull lightweight fast_info
+    try:
+        fast = tk.fast_info
+        cmp = float(fast.last_price) if fast.last_price else 100.0
+        prev_close = float(fast.previous_close) if fast.previous_close else cmp
+        h52 = float(fast.year_high) if fast.year_high else cmp
+        l52 = float(fast.year_low) if fast.year_low else cmp
+        mcap = float(fast.market_cap) if fast.market_cap else 0.0
+    except Exception:
+        cmp, prev_close, h52, l52, mcap = 100.0, 100.0, 100.0, 100.0, 0.0
+
+    # 2. Pull 1y historical bars safely
+    try:
+        df_hist = tk.history(period="1y", interval="1d")
+    except Exception:
+        df_hist = pd.DataFrame()
+
+    # 3. Pull deep info with safety fallback
+    try:
+        inf = tk.info
+    except Exception:
+        inf = {}
+
+    # 4. Pull quarterly financials safely
+    try:
+        q_fin = tk.quarterly_financials
+    except Exception:
+        q_fin = pd.DataFrame()
+
+    return {
+        "cmp": cmp,
+        "prev_close": prev_close,
+        "h52": h52,
+        "l52": l52,
+        "mcap": mcap,
+        "df_hist": df_hist,
+        "inf": inf,
+        "q_fin": q_fin
+    }
+
+# --- CONTINUOUS NEWS CHANNEL STYLE MOVING TICKER (BULK DOWNLOADED) ---
+@st.cache_data(ttl=120)
 def fetch_all_nse_indices():
+    tickers = list(INDICES_YAHOO_MAP.values())
     data = []
-    for name, ticker in INDICES_YAHOO_MAP.items():
-        try:
-            hist = yf.Ticker(ticker).history(period="2d")
-            if len(hist) >= 2:
-                curr = hist["Close"].iloc[-1]
-                prev = hist["Close"].iloc[-2]
-                chg = round(((curr - prev) / prev) * 100, 2)
-                data.append({"name": name, "val": f"{round(curr, 2):,}", "chg": chg, "ticker": ticker})
-            elif len(hist) == 1:
-                data.append({"name": name, "val": f"{round(hist['Close'].iloc[-1], 2):,}", "chg": 0.0, "ticker": ticker})
-            else:
-                data.append({"name": name, "val": "Track", "chg": 0.0, "ticker": ticker})
-        except Exception:
-            data.append({"name": name, "val": "Live", "chg": 0.0, "ticker": ticker})
+    try:
+        bulk = yf.download(tickers=tickers, period="5d", interval="1d", group_by="ticker", progress=False, threads=True)
+        for name, t_sym in INDICES_YAHOO_MAP.items():
+            try:
+                df_t = bulk[t_sym] if t_sym in bulk else None
+                if df_t is not None and not df_t.empty and len(df_t["Close"].dropna()) >= 2:
+                    closes = df_t["Close"].dropna()
+                    curr = float(closes.iloc[-1])
+                    prev = float(closes.iloc[-2])
+                    chg = round(((curr - prev) / prev) * 100, 2) if prev else 0.0
+                    data.append({"name": name, "val": f"{round(curr, 2):,}", "chg": chg, "ticker": t_sym})
+                else:
+                    data.append({"name": name, "val": "Track", "chg": 0.0, "ticker": t_sym})
+            except Exception:
+                data.append({"name": name, "val": "Live", "chg": 0.0, "ticker": t_sym})
+    except Exception:
+        for name, t_sym in INDICES_YAHOO_MAP.items():
+            data.append({"name": name, "val": "Live", "chg": 0.0, "ticker": t_sym})
     return data
 
 # --- MATHEMATICAL DVM SCORER ---
@@ -692,29 +773,26 @@ with main_tab_dossier:
         selected_label = st.selectbox("Search Stock / Company (NSE/BSE):", options=all_options, index=default_ix, key="main_stock_selector")
         stock_sym = stock_universe[selected_label]
         st.session_state.active_selected_ticker = stock_sym
-        yf_sym = f"{stock_sym}.NS"
 
-    with st.spinner(f"Ingesting real-time terminal dossier for {stock_sym}..."):
-        tk = yf.Ticker(yf_sym)
-        inf = tk.info
-        df_hist = tk.history(period="1y", interval="1d")
+    # Fast cached loading with rate-limit protection
+    dossier_data = fetch_stock_dossier_data(stock_sym)
+    cmp = dossier_data["cmp"]
+    prev_close = dossier_data["prev_close"]
+    day_chg = round(cmp - prev_close, 2)
+    day_chg_pct = round(((cmp - prev_close) / prev_close) * 100, 2) if prev_close else 0.0
+    h52 = dossier_data["h52"]
+    l52 = dossier_data["l52"]
+    low_recovery = round(((cmp - l52) / l52) * 100, 1) if l52 else 0.0
+    mcap_cr = round(dossier_data["mcap"] / 1e7, 1)
 
-        cmp = inf.get("currentPrice", inf.get("regularMarketPrice", 100.0))
-        prev_close = inf.get("previousClose", cmp)
-        day_chg = round(cmp - prev_close, 2)
-        day_chg_pct = round(((cmp - prev_close) / prev_close) * 100, 2) if prev_close else 0.0
-        h52 = inf.get("fiftyTwoWeekHigh", cmp)
-        l52 = inf.get("fiftyTwoWeekLow", cmp)
-        low_recovery = round(((cmp - l52) / l52) * 100, 1) if l52 else 0.0
-        vol_val = inf.get("volume", 0)
-        volume_m = f"{round(vol_val / 1e6, 2)}M" if vol_val >= 1e6 else f"{round(vol_val / 1e3, 1)}K"
+    inf = dossier_data["inf"]
+    sec = inf.get("sector", "General")
+    ind = inf.get("industry", "Heavy Electrical Equipment")
+    df_hist = dossier_data["df_hist"]
+    q_fin_raw = dossier_data["q_fin"]
 
-        sec = inf.get("sector", "General")
-        ind = inf.get("industry", "Heavy Electrical Equipment")
-
-        dvm = compute_dvm_scores(inf, df_hist)
-        swot = compute_true_swot(inf, df_hist)
-        q_fin_raw = tk.quarterly_financials
+    dvm = compute_dvm_scores(inf, df_hist)
+    swot = compute_true_swot(inf, df_hist)
 
     # COMPANY PROFILE HEADER
     st.markdown(f"""
@@ -729,7 +807,7 @@ with main_tab_dossier:
                     {'+' if day_chg >= 0 else ''}{day_chg} ({'+' if day_chg_pct >= 0 else ''}{day_chg_pct}%)
                 </span>
                 <span style="font-size:0.85rem; color:#10B981; font-weight:600;">▲ Near 52W High of ₹{h52}</span>
-                <span style="font-size:0.85rem; color:#94A3B8; margin-left:auto;">NSE+BSE Volume: <b style="color:#FFF;">{volume_m}</b></span>
+                <span style="font-size:0.85rem; color:#94A3B8; margin-left:auto;">Market Cap: <b style="color:#FFF;">₹{mcap_cr} Cr</b></span>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -812,26 +890,17 @@ with main_tab_dossier:
 
         st.markdown(f"### ⚖️ Sector Peers: `{stock_sym}`")
         resolved_peers = resolve_peers_dynamically(stock_sym, sec, ind)
+        peer_prices = batch_fetch_prices([stock_sym] + resolved_peers)
 
         peer_data = []
         for p in [stock_sym] + resolved_peers:
-            try:
-                p_inf = yf.Ticker(f"{p}.NS").info
-                p_cmp = p_inf.get("currentPrice", p_inf.get("regularMarketPrice"))
-                if p_cmp:
-                    peer_data.append({
-                        "Symbol": p,
-                        "LTP (₹)": p_cmp,
-                        "Market Cap (₹ Cr)": round(p_inf.get("marketCap", 0) / 1e7, 1) if p_inf.get("marketCap") else "-",
-                        "P/E (TTM)": round(p_inf.get("trailingPE", 0), 1) if p_inf.get("trailingPE") else "-",
-                        "Debt to Equity": round(p_inf.get("debtToEquity", 0), 2) if p_inf.get("debtToEquity") else "Nil",
-                        "ROE (%)": f"{round(p_inf.get('returnOnEquity', 0)*100, 1)}%" if p_inf.get("returnOnEquity") else "-"
-                    })
-            except Exception:
-                pass
-
-        if peer_data:
-            st.dataframe(pd.DataFrame(peer_data), use_container_width=True)
+            p_price = peer_prices.get(p, {}).get("cmp", "-")
+            peer_data.append({
+                "Symbol": p,
+                "LTP (₹)": p_price,
+                "P/E (TTM)": round(inf.get("trailingPE", 0), 1) if p == stock_sym and inf.get("trailingPE") else "-"
+            })
+        st.dataframe(pd.DataFrame(peer_data), use_container_width=True)
 
     # 2. FORECASTER
     with subtab_forecaster:
@@ -956,7 +1025,7 @@ with main_tab_dossier:
         else:
             st.info("No breaking news advisories triggered for this ticker.")
 
-    # 8. REPORTS (DIRECT ACCESS - ZERO 404s)
+    # 8. REPORTS
     with subtab_reports:
         st.markdown(f"### 📑 Verified Institutional Research Coverage: `{stock_sym}`")
         reports_for_stock = DIRECT_REPORT_ARCHIVES.get(stock_sym, [])
@@ -986,7 +1055,7 @@ with main_tab_dossier:
         else:
             st.info(f"Broker research notes for {stock_sym} are archived directly upon quarterly earnings disclosure filings.")
 
-    # 9. TECHNICALS (WITH INTERACTIVE HOVER EXPLANATIONS)
+    # 9. TECHNICALS (WITH HOVER EXPLANATIONS)
     with subtab_technicals:
         st.markdown(f"### ⚙️ Technical Cockpit & Moving Averages: `{stock_sym}`")
         if not df_hist.empty and len(df_hist) >= 30:
@@ -1082,7 +1151,7 @@ with main_tab_dossier:
             </div>
         """, unsafe_allow_html=True)
 
-    # 12. ALERTS (STOCK SPECIFIC)
+    # 12. ALERTS
     with subtab_alerts:
         st.markdown(f"### 🔔 Autonomous 24x7 Alpha Alerts: `{stock_sym}`")
         with st.form("alert_sub_form"):
@@ -1120,7 +1189,7 @@ with main_tab_dossier:
                 else:
                     st.warning("Database offline. Alert engine requires Supabase connection.")
 
-    # 13. ABOUT (WIKIPEDIA-STYLE COMPANY KUNDLI)
+    # 13. ABOUT
     with subtab_about:
         st.markdown(f"### 🏢 Comprehensive Corporate Dossier: `{inf.get('longName', stock_sym)}`")
         st.write(inf.get("longBusinessSummary", "Premier engineering and manufacturing enterprise."))
@@ -1139,7 +1208,7 @@ with main_tab_dossier:
         with st.expander("📊 Capital Structure & Corporate Identifiers", expanded=True):
             st.markdown(f"""
                 <table class="wiki-table">
-                    <tr><td class="wiki-header-col">Total Market Capitalization</td><td class="wiki-val-col">₹{round(inf.get('marketCap', 0)/1e7, 1)} Crores</td></tr>
+                    <tr><td class="wiki-header-col">Total Market Capitalization</td><td class="wiki-val-col">₹{mcap_cr} Crores</td></tr>
                     <tr><td class="wiki-header-col">National Stock Exchange (NSE) Symbol</td><td class="wiki-val-col">{stock_sym}</td></tr>
                     <tr><td class="wiki-header-col">Bombay Stock Exchange (BSE) Code</td><td class="wiki-val-col">{inf.get('bseId', '500103')}</td></tr>
                     <tr><td class="wiki-header-col">ISIN Number</td><td class="wiki-val-col">{inf.get('isin', 'INE257A01026')}</td></tr>
@@ -1148,12 +1217,11 @@ with main_tab_dossier:
             """, unsafe_allow_html=True)
 
 # ==============================================================================
-# MAIN TAB 2: INTERACTIVE INDEX EXPLORER (DETAILED INDEX DRILLDOWN)
+# MAIN TAB 2: INTERACTIVE INDEX EXPLORER
 # ==============================================================================
 with main_tab_indices_view:
     st.markdown("### 📈 Interactive Index Explorer & Constituent Matrix")
     
-    # Quick select from top moving ticker
     idx_cols = st.columns(len(INDICES_YAHOO_MAP))
     for i, idx_name in enumerate(INDICES_YAHOO_MAP.keys()):
         if idx_cols[i].button(idx_name.replace("NIFTY ", "N_"), key=f"quick_idx_btn_{i}"):
@@ -1164,12 +1232,13 @@ with main_tab_indices_view:
     idx_ticker = INDICES_YAHOO_MAP.get(sel_idx, "^NSEI")
 
     with st.spinner(f"Loading deep institutional analytics for {sel_idx}..."):
-        tk_idx = yf.Ticker(idx_ticker)
-        hist_idx = tk_idx.history(period="1y", interval="1d")
-        
-        # Calculate Returns
+        try:
+            hist_idx = yf.Ticker(idx_ticker).history(period="1y", interval="1d")
+        except Exception:
+            hist_idx = pd.DataFrame()
+
         ret_1d, ret_1m, ret_6m, ret_1y = 0.0, 0.0, 0.0, 0.0
-        curr_idx_p = hist_idx["Close"].iloc[-1] if not hist_idx.empty else 0.0
+        curr_idx_p = float(hist_idx["Close"].iloc[-1]) if not hist_idx.empty else 0.0
         if len(hist_idx) >= 2:
             ret_1d = round(((curr_idx_p - hist_idx["Close"].iloc[-2]) / hist_idx["Close"].iloc[-2]) * 100, 2)
         if len(hist_idx) >= 21:
@@ -1183,7 +1252,7 @@ with main_tab_indices_view:
         <div style="padding:16px 20px; background:rgba(13,18,31,0.85); border:1px solid var(--border-glass); border-radius:12px; margin-bottom:1.5rem;">
             <div style="font-size:1.6rem; font-weight:800; color:#FFFFFF;">{sel_idx} ({idx_ticker})</div>
             <div style="font-size:2.2rem; font-weight:800; font-family:'JetBrains Mono'; color:#00E5FF; margin-top:4px;">{round(curr_idx_p, 2):,}</div>
-            <div style="display:flex; gap:20px; margin-top:14px;">
+            <div style="display:flex; gap:20px; margin-top:14px; flex-wrap:wrap;">
                 <div style="padding:8px 14px; background:rgba(255,255,255,0.03); border-radius:8px;">
                     <span style="font-size:0.75rem; color:#94A3B8;">1-Day Return</span>
                     <div style="font-weight:700; font-family:'JetBrains Mono'; color:{'#10B981' if ret_1d>=0 else '#EF4444'};">{'+' if ret_1d>=0 else ''}{ret_1d}%</div>
@@ -1204,50 +1273,37 @@ with main_tab_indices_view:
         </div>
     """, unsafe_allow_html=True)
 
-    # Constituent Table with Direct Row Selection
-    st.markdown(f"#### 📋 Constituents of `{sel_idx}` (Click any row to open Stock Dossier)")
+    # Bulk fetch constituent prices
     idx_members = FULL_INDEX_CONSTITUENTS.get(sel_idx, FULL_INDEX_CONSTITUENTS["NIFTY 50"])
+    idx_prices = batch_fetch_prices(idx_members)
 
-    def fetch_idx_row(sym):
-        try:
-            s_inf = yf.Ticker(f"{sym}.NS").info
-            s_cmp = s_inf.get("currentPrice", s_inf.get("regularMarketPrice"))
-            s_prev = s_inf.get("previousClose", s_cmp)
-            chg = round(s_cmp - s_prev, 2) if (s_cmp and s_prev) else 0.0
-            chg_p = round((chg / s_prev) * 100, 2) if s_prev else 0.0
-            return {
-                "Symbol": sym,
-                "Company": s_inf.get("shortName", sym),
-                "LTP (₹)": s_cmp,
-                "Day Change": f"{'+' if chg>=0 else ''}{chg} ({'+' if chg_p>=0 else ''}{chg_p}%)",
-                "52W High": s_inf.get("fiftyTwoWeekHigh", "-"),
-                "52W Low": s_inf.get("fiftyTwoWeekLow", "-"),
-                "Market Cap (₹ Cr)": round(s_inf.get("marketCap", 0) / 1e7, 1) if s_inf.get("marketCap") else "-"
-            }
-        except Exception:
-            return {"Symbol": sym, "Company": sym, "LTP (₹)": "-", "Day Change": "-", "52W High": "-", "52W Low": "-", "Market Cap (₹ Cr)": "-"}
+    idx_rows = []
+    for s in idx_members:
+        p_obj = idx_prices.get(s, {"cmp": 0.0, "chg": 0.0, "chg_pct": 0.0})
+        idx_rows.append({
+            "Symbol": s,
+            "LTP (₹)": p_obj["cmp"],
+            "Day Change": f"{'+' if p_obj['chg']>=0 else ''}{p_obj['chg']} ({'+' if p_obj['chg_pct']>=0 else ''}{p_obj['chg_pct']}%)"
+        })
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        idx_display_data = list(executor.map(fetch_idx_row, idx_members[:35]))
-
-    if idx_display_data:
-        df_idx_show = pd.DataFrame(idx_display_data)
-        event_idx = st.dataframe(
-            df_idx_show,
-            use_container_width=True,
-            on_select="rerun",
-            selection_mode="single-row",
-            key="index_constituent_table"
-        )
-        if event_idx and event_idx.selection and event_idx.selection.rows:
-            selected_row_idx = event_idx.selection.rows[0]
-            chosen_sym = df_idx_show.iloc[selected_row_idx]["Symbol"]
-            st.session_state.active_selected_ticker = chosen_sym
-            st.success(f"Loaded {chosen_sym}! Switch to Institutional Stock Dossier tab.")
-            st.rerun()
+    df_idx_show = pd.DataFrame(idx_rows)
+    st.caption("👉 **Direct Click Navigation:** Select any row to load into Stock Dossier.")
+    event_idx = st.dataframe(
+        df_idx_show,
+        use_container_width=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="idx_table_select"
+    )
+    if event_idx and event_idx.selection and event_idx.selection.rows:
+        sel_row = event_idx.selection.rows[0]
+        chosen_s = df_idx_show.iloc[sel_row]["Symbol"]
+        st.session_state.active_selected_ticker = chosen_s
+        st.success(f"Selected {chosen_s}! Opening Dossier...")
+        st.rerun()
 
 # ==============================================================================
-# MAIN TAB 3: WATCHLISTS (DIRECT ROW CLICK NAVIGATION + CUSTOM DELETE)
+# MAIN TAB 3: WATCHLISTS (BATCH FETCHED + 0-LAG INSTANT CLICK)
 # ==============================================================================
 with main_tab_watchlist:
     st.markdown("### 👁️ Institutional Market Watchlists & Custom Hub")
@@ -1264,7 +1320,7 @@ with main_tab_watchlist:
         
         c_page_info, c_page_select = st.columns([3, 1])
         with c_page_info:
-            st.caption(f"Displaying **{total_stocks}** verified constituents of **{chosen_index}**. Page {st.session_state.watchlist_page} of {total_pages}. **Click any row to open in Dossier!**")
+            st.caption(f"Displaying **{total_stocks}** constituents of **{chosen_index}**. Page {st.session_state.watchlist_page} of {total_pages}. **Click any row to open in Dossier!**")
         with c_page_select:
             selected_page = st.selectbox("Select Page:", list(range(1, total_pages + 1)), index=min(st.session_state.watchlist_page - 1, total_pages - 1), key="wl_page_picker")
             st.session_state.watchlist_page = selected_page
@@ -1273,7 +1329,6 @@ with main_tab_watchlist:
         end_idx = min(start_idx + page_size, total_stocks)
         current_batch = target_constituents[start_idx:end_idx]
     else:
-        # CUSTOM WATCHLIST MANAGER (ADD, DELETE WATCHLIST, REMOVE STOCK)
         c_w1, c_w2 = st.columns([1.5, 2], gap="medium")
         with c_w1:
             st.markdown("#### ➕ Create New Custom Watchlist")
@@ -1310,7 +1365,6 @@ with main_tab_watchlist:
                 target_constituents = st.session_state.custom_watchlists.get(selected_custom, [])
                 current_batch = target_constituents
 
-                # Single Stock Removal Control
                 if target_constituents:
                     st.markdown("##### ➖ Remove a Stock from this Watchlist")
                     r_col1, r_col2 = st.columns([2, 1])
@@ -1327,51 +1381,36 @@ with main_tab_watchlist:
                 st.info("No custom watchlists created yet. Create one on the left.")
                 target_constituents, current_batch = [], []
 
-    # Parallel Data Fetcher with Direct Interactive Row Selection
+    # Fast bulk price fetch for current page
     if current_batch:
-        def fetch_ticker_row(sym):
-            try:
-                s_inf = yf.Ticker(f"{sym}.NS").info
-                s_cmp = s_inf.get("currentPrice", s_inf.get("regularMarketPrice"))
-                s_prev = s_inf.get("previousClose", s_cmp)
-                chg = round(s_cmp - s_prev, 2) if (s_cmp and s_prev) else 0.0
-                chg_p = round((chg / s_prev) * 100, 2) if s_prev else 0.0
-                return {
-                    "Symbol": sym,
-                    "Company Name": s_inf.get("shortName", sym),
-                    "LTP (₹)": s_cmp,
-                    "Day Change": f"{'+' if chg>=0 else ''}{chg} ({'+' if chg_p>=0 else ''}{chg_p}%)",
-                    "52W High (₹)": s_inf.get("fiftyTwoWeekHigh", "-"),
-                    "52W Low (₹)": s_inf.get("fiftyTwoWeekLow", "-"),
-                    "Market Cap (₹ Cr)": round(s_inf.get("marketCap", 0) / 1e7, 1) if s_inf.get("marketCap") else "-",
-                    "P/E (TTM)": round(s_inf.get("trailingPE", 0), 1) if s_inf.get("trailingPE") else "-"
-                }
-            except Exception:
-                return {"Symbol": sym, "Company Name": sym, "LTP (₹)": "-", "Day Change": "-", "52W High (₹)": "-", "52W Low (₹)": "-", "Market Cap (₹ Cr)": "-", "P/E (TTM)": "-"}
+        batch_prices = batch_fetch_prices(current_batch)
+        wl_display_rows = []
+        for sym in current_batch:
+            p_obj = batch_prices.get(sym, {"cmp": 0.0, "chg": 0.0, "chg_pct": 0.0})
+            wl_display_rows.append({
+                "Symbol": sym,
+                "LTP (₹)": p_obj["cmp"],
+                "Day Change": f"{'+' if p_obj['chg']>=0 else ''}{p_obj['chg']} ({'+' if p_obj['chg_pct']>=0 else ''}{p_obj['chg_pct']}%)"
+            })
 
-        with st.spinner(f"Fetching real-time metrics for {len(current_batch)} stocks..."):
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                wl_display_rows = list(executor.map(fetch_ticker_row, current_batch))
-
-        if wl_display_rows:
-            df_wl_show = pd.DataFrame(wl_display_rows)
-            st.caption("👉 **Direct Interactive Click:** Click on any row to open that stock's complete Dossier immediately.")
-            event_wl = st.dataframe(
-                df_wl_show,
-                use_container_width=True,
-                on_select="rerun",
-                selection_mode="single-row",
-                key="main_watchlist_table"
-            )
-            if event_wl and event_wl.selection and event_wl.selection.rows:
-                selected_row = event_wl.selection.rows[0]
-                clicked_stock = df_wl_show.iloc[selected_row]["Symbol"]
-                st.session_state.active_selected_ticker = clicked_stock
-                st.success(f"Selected {clicked_stock}! Opening Dossier...")
-                st.rerun()
+        df_wl_show = pd.DataFrame(wl_display_rows)
+        st.caption("👉 **Click any row:** Immediately switches to that stock's complete Dossier.")
+        event_wl = st.dataframe(
+            df_wl_show,
+            use_container_width=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="main_watchlist_table"
+        )
+        if event_wl and event_wl.selection and event_wl.selection.rows:
+            selected_row = event_wl.selection.rows[0]
+            clicked_stock = df_wl_show.iloc[selected_row]["Symbol"]
+            st.session_state.active_selected_ticker = clicked_stock
+            st.success(f"Selected {clicked_stock}! Opening Dossier...")
+            st.rerun()
 
 # ==============================================================================
-# MAIN TAB 4: FII / DII DAILY TRADING ACTIVITY (LAST 10 TRADING DAYS)
+# MAIN TAB 4: FII / DII DAILY TRADING ACTIVITY
 # ==============================================================================
 with main_tab_fii_dii:
     st.markdown("### 🏛️ Daily FII / DII Institutional Cash Flow Ledger (Last 10 Trading Sessions)")
